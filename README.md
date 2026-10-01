@@ -22,4 +22,38 @@
 현재 개발 진행 중
 
 ## 프로젝트 구조
-추후 업데이트 예정
+
+각 디렉터리는 하나의 기능과 책임만 담당하도록 **분리(SRP)** 하여,
+기능 수정 및 오류 추적이 쉽도록 구성합니다.
+
+```text
+Retrace-Project/
+├─ stm32/                 # 서보·레이저·스마트 서랍 제어
+│  ├─ Core/
+│  ├─ Drivers/
+│  ├─ cmake/
+│  ├─ CMakeLists.txt
+│  └─ Retrace_STM32.ioc
+│
+├─ arduino/               # PIR·버튼 입력 처리
+│  └─ Retrace_Arduino/
+│     ├─ Retrace_Arduino.ino
+│     └─ src/
+│        ├─ pir/
+│        ├─ button/
+│        └─ communication/
+│
+├─ jetson_nano/           # 객체 인식·기록·시스템 제어
+│  ├─ vision/             # YOLO / OpenCV
+│  ├─ last_seen/          # 마지막 목격 정보 관리
+│  ├─ storage/            # DB / 로그
+│  ├─ communication/      # Arduino / STM32 통신
+│  └─ server/             # Web / PWA 서버
+│
+├─ web/                   # 사용자 Web / PWA
+│
+├─ docs/                  # 회로도·구성도·개발 문서
+│
+├─ .gitignore
+└─ README.md
+
