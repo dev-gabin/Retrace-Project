@@ -92,7 +92,7 @@ BLE는 **위치 추정 용도로 사용하지 않습니다.**
 
 ---
 
-# 시스템 구성
+## 시스템 구성
 
 | 장치 | 역할 |
 |---|---|
@@ -105,7 +105,19 @@ BLE는 **위치 추정 용도로 사용하지 않습니다.**
 
 ---
 
-# 시스템 구조
+## 사용 기술
+
+- Jetson Nano / Linux
+- C / C++
+- YOLO / OpenCV
+- Arduino Uno
+- STM32 NUCLEO-F411RE (STM32CubeMX / CMake)
+- Wi-Fi / Bluetooth (HC-06) / BLE
+- GitHub / Jira
+
+---
+
+## 시스템 구조
 
 ```text
                          Camera
@@ -140,9 +152,9 @@ Jetson과 통신하여 전체 시스템을 동작시킵니다.
 
 ---
 
-# 하드웨어 역할
+## 하드웨어 역할
 
-## Jetson Nano
+### Jetson Nano
 
 시스템의 중앙 처리 장치입니다.
 
@@ -160,7 +172,7 @@ Jetson과 통신하여 전체 시스템을 동작시킵니다.
 
 ---
 
-## Arduino Uno
+### Arduino Uno
 
 **스마트 서랍 영역**을 담당합니다.
 
@@ -178,9 +190,12 @@ Arduino
 └─ Emergency Button
 ```
 
+Jetson ↔ Arduino 통신은  
+**HC-06 Bluetooth** 방식을 사용합니다.
+
 ---
 
-## STM32 NUCLEO-F411RE
+### STM32 NUCLEO-F411RE
 
 **카메라/상단 장치 영역**을 담당합니다.
 
@@ -205,9 +220,9 @@ Jetson ↔ STM32 개발 통신은
 
 ---
 
-# 데이터 흐름
+## 데이터 흐름
 
-## 물건 감지
+### 물건 감지
 
 ```text
 Camera
@@ -223,7 +238,7 @@ Last Seen 갱신
 DB + Image 저장
 ```
 
-## 레이저 위치 안내
+### 레이저 위치 안내
 
 ```text
 Web / PWA
@@ -237,7 +252,7 @@ Pan/Tilt 이동
 Laser ON
 ```
 
-## 스마트 서랍
+### 스마트 서랍
 
 ```text
 Web / PWA
@@ -251,7 +266,7 @@ Arduino
 Drawer Servo 동작
 ```
 
-## PIR 감지
+### PIR 감지
 
 ```text
 PIR
@@ -263,7 +278,7 @@ Jetson Nano
 활동 상태 판단
 ```
 
-## 비상 버튼
+### 비상 버튼
 
 ```text
 Emergency Button
@@ -277,150 +292,71 @@ Emergency Button
 
 ---
 
-# 프로젝트 구조
+## 프로젝트 구조
 
 ```text
 Retrace-Project/
 │
-├─ arduino/
-│  ├─ arduino.ino
-│  │
+├─ arduino/                          # 스마트 서랍 영역
+│  ├─ arduino.ino                    # setup() / loop(), 전체 흐름
 │  └─ src/
 │     ├─ drawer/
-│     │  ├─ DrawerController.h
-│     │  └─ DrawerController.cpp
-│     │
+│     │  └─ DrawerController.h/.cpp  # 서랍 LED ×6, 팝업 서보 제어
 │     ├─ button/
-│     │  ├─ EmergencyButton.h
-│     │  └─ EmergencyButton.cpp
-│     │
+│     │  └─ EmergencyButton.h/.cpp   # 비상 버튼 입력
 │     └─ communication/
-│        ├─ Communication.h
-│        └─ Communication.cpp
+│        └─ Communication.h/.cpp     # ← Jetson: 서랍 명령 / → Jetson: 비상 버튼 이벤트
 │
-├─ jetson_nano/
+├─ jetson_nano/                      # 중앙 처리 (C/C++)
 │  ├─ main.cpp
 │  ├─ CMakeLists.txt
-│  │
 │  ├─ vision/
-│  │  ├─ Detector.h
-│  │  └─ Detector.cpp
-│  │
+│  │  └─ Detector.h/.cpp             # 객체 탐지 · 영상 처리
 │  ├─ record/
-│  │  ├─ LastSeen.h
-│  │  └─ LastSeen.cpp
-│  │
+│  │  └─ LastSeen.h/.cpp             # 마지막 목격 정보 생성 · 관리
 │  ├─ storage/
-│  │  ├─ Database.h
-│  │  ├─ Database.cpp
-│  │  ├─ ImageStorage.h
-│  │  └─ ImageStorage.cpp
-│  │
+│  │  ├─ Database.h/.cpp             # DB 저장
+│  │  └─ ImageStorage.h/.cpp         # 이미지 저장
 │  ├─ communication/
-│  │  ├─ ArduinoLink.h
-│  │  ├─ ArduinoLink.cpp
-│  │  ├─ Stm32Link.h
-│  │  └─ Stm32Link.cpp
-│  │
+│  │  ├─ ArduinoLink.h/.cpp          # → 서랍 명령 / ← 비상 버튼 이벤트
+│  │  └─ Stm32Link.h/.cpp            # → Pan/Tilt · 레이저 명령 / ← PIR 이벤트
 │  └─ server/
-│     ├─ Server.h
-│     └─ Server.cpp
+│     └─ Server.h/.cpp               # Web/PWA 요청 처리
 │
-├─ stm32/
-│  ├─ cmake/
-│  │
+├─ stm32/                            # 카메라 · 상단 장치 영역 (CubeMX + CMake)
 │  ├─ Core/
-│  │  ├─ Inc/
-│  │  │  ├─ main.h
-│  │  │  ├─ stm32f4xx_hal_conf.h
-│  │  │  ├─ stm32f4xx_it.h
-│  │  │  ├─ pir_sensor.h
-│  │  │  ├─ pan_tilt.h
-│  │  │  └─ laser.h
-│  │  │
+│  │  ├─ Inc/                        # 헤더 (아래 Src와 짝)
 │  │  └─ Src/
-│  │     ├─ main.c
-│  │     ├─ stm32f4xx_hal_msp.c
-│  │     ├─ stm32f4xx_it.c
-│  │     ├─ syscalls.c
-│  │     ├─ sysmem.c
-│  │     ├─ system_stm32f4xx.c
-│  │     ├─ pir_sensor.c
-│  │     ├─ pan_tilt.c
-│  │     └─ laser.c
-│  │
-│  ├─ Drivers/
+│  │     ├─ main.c                   # CubeMX 생성 (초기화 · 메인 루프)
+│  │     ├─ pir_sensor.c             # PIR 입력 처리
+│  │     ├─ pan_tilt.c               # Pan/Tilt 서보 PWM
+│  │     ├─ laser.c                  # 레이저 ON/OFF
+│  │     └─ ...                      # 그 외 CubeMX 생성 파일
+│  ├─ Drivers/                       # HAL · CMSIS (CubeMX 생성)
+│  ├─ cmake/
 │  ├─ CMakeLists.txt
 │  ├─ CMakePresets.json
-│  ├─ Retrace_STM32.ioc
+│  ├─ Retrace_STM32.ioc              # CubeMX 설정 (핀맵: docs/stm32_pinmap.md)
 │  ├─ startup_stm32f411xe.s
 │  └─ STM32F411xx_FLASH.ld
 │
-├─ web/
-│
-├─ docs/
-│
+├─ web/                              # 사용자 Web / PWA
+├─ docs/                             # 회로도 · 구성도 · 개발 문서
+├─ .gitattributes
 ├─ .gitignore
 └─ README.md
 ```
 
+> 프로젝트 구조는 개발 진행에 따라 변경될 수 있습니다.
+
 ---
 
-# 코드 모듈 역할
+## 개발 문서
 
-## Arduino
+- [STM32 핀맵](docs/stm32_pinmap.md)
 
-```text
-DrawerController
-├─ 서랍 LED ×6 제어
-└─ 서랍 팝업 서보 제어
+---
 
-EmergencyButton
-└─ 비상 버튼 입력 처리
+## 진행 상태
 
-Communication
-├─ Jetson → Arduino : 서랍 제어 명령
-└─ Arduino → Jetson : 비상 버튼 이벤트
-```
-
-## Jetson Nano
-
-```text
-Detector
-└─ 객체 탐지 / 영상 처리
-
-LastSeen
-└─ 마지막 목격 정보 생성 및 관리
-
-Database
-└─ 데이터베이스 저장
-
-ImageStorage
-└─ 이미지 저장
-
-ArduinoLink
-├─ 서랍 LED/서보 명령 송신
-└─ 비상 버튼 이벤트 수신
-
-Stm32Link
-├─ Pan/Tilt/레이저 명령 송신
-└─ PIR 이벤트 수신
-
-Server
-└─ Web/PWA 요청 처리
-```
-
-## STM32
-
-```text
-pir_sensor
-└─ PIR 입력 처리
-
-pan_tilt
-├─ Pan Servo PWM
-└─ Tilt Servo PWM
-
-laser
-└─ Laser ON/OFF
-```
-
+**현재 개발 진행 중**
