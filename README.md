@@ -3,12 +3,13 @@
 > 스마트 공간 블랙박스 기반 분실물 위치 기억 및 탐색 시스템
 
 Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하고,  
-물건이 마지막으로 확인된 **위치·시간·이미지**를 기록하여 분실 시 빠르게 찾을 수 있도록 돕는 임베디드 시스템입니다.
+물건이 마지막으로 확인된 **위치·시간·이미지**를 기록하여 분실 시 빠르게 찾을 수 있도록 돕는 IoT 시스템입니다.
 
 단순히 현재 물건을 탐지하는 것이 아니라, 물건이 시야에서 사라지더라도  
 **마지막 목격 정보(Last Seen)** 를 기억하고 복원하는 것을 핵심 목표로 합니다.
 
-카메라 기반 비주얼 메모리를 중심으로 **Pan/Tilt 레이저**, **스마트 서랍**, **Web/PWA**, **BLE 부저**를 연동합니다.
+**허브(Jetson Nano) + 노드** 구조로, 카메라 기반 비주얼 메모리를 중심으로  
+**레이저 안내**, **스마트 서랍**, **스마트 현관등**, **BLE 부저**, **Web/PWA**를 연동합니다.
 
 ---
 
@@ -26,20 +27,23 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 
 ### 2. Last Seen 기록
 
-물건이 마지막으로 관찰된 정보를 저장합니다.
+물건이 마지막으로 관찰된 순간을 **스냅샷**으로 저장합니다.  
+영상을 계속 녹화하지 않고 필요한 순간만 기록합니다.
 
 - 마지막 위치
 - 마지막 관찰 시간
-- 마지막 이미지
+- 마지막 이미지 (스냅샷)
 - 서랍 내부에 있는 경우 서랍 ID
+- 상태 (보임 / 가림 / 불확실)
 
 ### 3. Pan/Tilt 레이저 안내
 
-마지막으로 확인된 위치를 기반으로 레이저가 해당 위치를 가리켜  
+마지막으로 확인된 위치를 레이저가 직접 가리켜  
 사용자가 물건을 쉽게 찾을 수 있도록 합니다.
 
 - 2축 Pan/Tilt 서보
 - 레이저 ON/OFF
+- 카메라와 레이저를 한 몸체(메인 유닛)로 고정해 조준 보정을 단순화
 - STM32에서 제어
 
 ### 4. 스마트 서랍
@@ -48,12 +52,19 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 
 - 서랍 LED ×6
 - 해당 서랍 LED 점등
-- 서랍 팝업 서보
+- 서랍 팝업 서보 ×6 (서랍마다 1개, 뒤에서 밀어내는 방식)
+- 일정 시간 후 LED 자동 소등 (타이머 방식)
+- 새 서랍 요청 시 이전 서랍 LED는 즉시 소등 (항상 하나만 점등)
 - Arduino에서 제어
+
+> **구현 시 주의**: 타이머는 `delay()`가 아니라 `millis()`로 구현합니다.  
+> `delay()`를 쓰면 대기하는 동안 Arduino가 멈춰서 비상 버튼 입력과 Bluetooth 명령을 받지 못합니다.  
+> (점등 시각을 기록해 두고, `loop()`에서 `millis() - 점등 시각 >= 소등 시간`이면 LED를 끄는 방식)  
+> 소등 시간은 시연 환경에서 조정합니다 (예: 10~15초).
 
 ### 5. PIR 활동 감지
 
-PIR 센서를 이용하여 공간 내 움직임을 감지합니다.
+메인 유닛의 PIR 센서로 공간 내 움직임을 감지합니다.
 
 - 활동 감지
 - 카메라 분석 활성/대기 판단에 활용
@@ -61,15 +72,24 @@ PIR 센서를 이용하여 공간 내 움직임을 감지합니다.
 
 ### 6. 비상 스마트폰 찾기
 
-서랍에 설치된 물리 버튼을 이용해 스마트폰 찾기 기능을 요청합니다.
+폰을 잃어버려 앱을 쓸 수 없을 때, 서랍에 설치된 물리 버튼으로 **폰에서 사이렌을 울립니다.**
 
 - 비상 버튼 입력
 - Arduino에서 버튼 감지
 - Jetson으로 이벤트 전달
+- Jetson의 **ntfy 서버**가 스마트폰 ntfy 앱으로 최고 우선순위 알림 전송
+- 앱을 열 때까지 알림음 반복 → **폰 사이렌**
+
+> **왜 ntfy인가**: 웹 페이지(PWA)는 화면이 꺼져 있거나 백그라운드에 있으면 소리를 낼 수 없습니다.  
+> ntfy는 Jetson에 직접 설치하는 알림 서버로, 폰과 연결을 유지해 **화면이 꺼진 상태에서도** 알림을 받을 수 있습니다.  
+> 외부 서버(Firebase)를 거치지 않고 집 안 네트워크에서 동작합니다.
+>
+> **폰 설정 (Android)**: ntfy 앱 배터리 최적화 제외 / "최고 우선순위 계속 울리기" 켜기  
+> **한계**: 폰이 집 Wi-Fi 범위 안에 있어야 하며, 무음 모드 동작은 기기별로 검증이 필요합니다.
 
 ### 7. Web / PWA
 
-스마트폰 또는 PC에서 Retrace 시스템을 사용할 수 있는 인터페이스입니다.
+스마트폰 또는 PC에서 앱 설치 없이 Retrace를 사용할 수 있는 인터페이스입니다.
 
 - 물건 검색
 - Last Seen 정보 확인
@@ -80,7 +100,7 @@ PIR 센서를 이용하여 공간 내 움직임을 감지합니다.
 
 ### 8. BLE 부저
 
-일부 중요 물건에는 BLE 장치를 부착하여 필요할 때 부저음을 울릴 수 있도록 합니다.
+중요 물건에 BLE 부저 태그를 부착하여, 카메라가 보지 못하는 곳(사각지대)에서도 소리로 찾을 수 있도록 합니다.
 
 BLE는 **위치 추정 용도로 사용하지 않습니다.**
 
@@ -90,18 +110,26 @@ BLE는 **위치 추정 용도로 사용하지 않습니다.**
 
 물건의 위치 탐색은 기본적으로 **카메라 Last Seen + 레이저 + 스마트 서랍**을 이용합니다.
 
+### 9. 스마트 현관등 · 외출 알림
+
+출입 노드(현관등)가 외출을 감지하고, 중요 물건을 두고 나가면 알려줍니다.
+
+- 평소: 일반 현관 센서등처럼 동작 (PIR 감지 시 점등)
+- 외출 감지 시 Jetson이 차키 Last Seen 확인
+- 차키가 아직 책상에 있으면 → **현관등 경고 점등 + 레이저로 차키 안내 + 폰 알림(ntfy)** ("차키 챙기셨나요?")
+- 기본 점등은 현관등이 스스로 처리하고, 경고만 Jetson이 명령 (Jetson이 꺼져도 기본 조명은 동작)
+
 ---
 
 ## 시스템 구성
 
-| 장치 | 역할 |
-|---|---|
-| Jetson Nano | AI 객체 탐지, Last Seen 처리, DB/이미지 저장, Web 서버, MCU 통신 |
-| Arduino Uno | 서랍 LED ×6, 서랍 팝업 서보, 비상 버튼 |
-| STM32 NUCLEO-F411RE | PIR 감지, Pan/Tilt 서보, 레이저 |
-| Camera | 공간 영상 입력 |
-| Web / PWA | 검색 및 시스템 제어 UI |
-| BLE Device | 중요 물건의 부저 호출 |
+| 노드 | 장치 | 역할 |
+|---|---|---|
+| **메인 유닛 (허브)** | Jetson Nano + 카메라 + STM32 | AI 객체 탐지, Last Seen, DB/이미지 저장, Web 서버, MQTT 브로커, 레이저 안내, PIR |
+| **서랍 노드** | Arduino Uno + HC-06 | 서랍 LED ×6, 서랍 팝업 서보 ×6, 비상 버튼 |
+| **출입 노드 (스마트 현관등)** | LOLIN D32 (ESP32) + PIR + LED | 외출 감지, 현관등 점등·경고 |
+| **부저 태그** | ESP32-C3 + 부저 | 중요 물건 부저 호출 |
+| **사용자 화면** | Web / PWA | 검색 및 시스템 제어 UI |
 
 ---
 
@@ -112,7 +140,10 @@ BLE는 **위치 추정 용도로 사용하지 않습니다.**
 - YOLO / OpenCV
 - Arduino Uno
 - STM32 NUCLEO-F411RE (STM32CubeMX / CMake)
-- Wi-Fi / Bluetooth (HC-06) / BLE
+- ESP32 (LOLIN D32, ESP32-C3)
+- Wi-Fi / MQTT (Mosquitto)
+- ntfy (폰 푸시 알림)
+- Bluetooth (HC-06) / BLE
 - GitHub / Jira
 
 ---
@@ -120,103 +151,172 @@ BLE는 **위치 추정 용도로 사용하지 않습니다.**
 ## 시스템 구조
 
 ```text
-                         Camera
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │ Jetson Nano │
-                    │             │
-                    │ YOLO/OpenCV │
-                    │ Last Seen   │
-                    │ DB / Image  │
-                    │ Web Server  │
-                    └──────┬──────┘
-                           │
-              ┌────────────┴────────────┐
-              │                         │
-              ▼                         ▼
-        ┌─────────────┐          ┌─────────────┐
-        │ Arduino Uno │          │    STM32    │
-        └──────┬──────┘          └──────┬──────┘
-               │                        │
-        ┌──────┼──────┐          ┌──────┼──────┐
-        │      │      │          │      │      │
-      LED×6  Drawer  Emergency  PIR  Pan/Tilt Laser
-             Servo    Button
+┌────────────── Main Unit (Hub) ──────────────┐
+│                                             │
+│  [ USB Camera ]                             │
+│        │ USB                                │
+│        v                                    │
+│  [ Jetson Nano ]   Vision / Last Seen / DB  │
+│        │           Web Server / MQTT Broker │
+│        │ USB Serial                         │
+│        v                                    │
+│  [ STM32 Laser Head ]                       │
+│     Pan/Tilt / Laser / PIR                  │
+│                                             │
+└────┬───────────┬───────────┬───────────┬────┘
+     │           │           │           │
+ Bluetooth     Wi-Fi        BLE        Wi-Fi
+  (HC-06)     (MQTT)                  (HTTP)
+     │           │           │           │
+┌────┴────┐ ┌────┴────┐ ┌────┴────┐ ┌────┴────┐
+│  Drawer │ │ Entrance│ │  Buzzer │ │ Web/PWA │
+│   Node  │ │   Node  │ │   Tag   │ │         │
+│ Arduino │ │LOLIN D32│ │ ESP32-C3│ │ Phone/PC│
+│         │ │         │ │         │ │         │
+│  LED x6 │ │   PIR   │ │  Buzzer │ │         │
+│ Servo x6│ │   LED   │ │         │ │         │
+│ SOS Btn │ │         │ │         │ │         │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘
 ```
 
-Jetson Nano가 시스템의 중앙 처리 장치 역할을 담당합니다.
+| 노드 | 설명 |
+|---|---|
+| Main Unit (Hub) | Jetson Nano + 카메라 + STM32 레이저 헤드를 한 몸체로 구성 |
+| Drawer Node | 스마트 서랍 + 비상 폰 찾기(사이렌) 버튼 (Arduino Uno + HC-06) |
+| Entrance Node | 스마트 현관등 (LOLIN D32 + PIR + LED) |
+| Buzzer Tag | BLE 부저 태그 (ESP32-C3) |
+| Web/PWA | 사용자 화면 (스마트폰 / PC), 폰 사이렌은 ntfy 앱으로 수신 |
 
-Arduino와 STM32는 각각 맡은 센서 및 구동 장치를 제어하고  
-Jetson과 통신하여 전체 시스템을 동작시킵니다.
+Jetson Nano가 허브로서 판단·기록·서비스를 담당하고,  
+각 노드는 맡은 센서 및 구동 장치를 제어하며 허브와 통신합니다.
+
+---
+
+## 통신 구조
+
+설치 위치와 용도에 따라 통신 방식을 나눴습니다.
+
+| 연결 | 방식 | 선택 이유 |
+|---|---|---|
+| Jetson ↔ 카메라 | USB | 메인 유닛 내부 |
+| Jetson ↔ STM32 | USB Serial (ST-LINK VCP) | 메인 유닛 내부, 카메라·레이저 위치 고정 |
+| Jetson ↔ 서랍 노드 | **Bluetooth** (HC-06) | 같은 방 안 가구 — 근거리, 공유기 불필요 |
+| Jetson ↔ 출입 노드 | **Wi-Fi** (MQTT) | 다른 공간(현관) — 공유기 경유 |
+| Jetson ↔ 부저 태그 | **BLE** | 물건에 부착되는 저전력 장치 |
+| Jetson ↔ Web / PWA | **Wi-Fi** (HTTP) | 사용자 화면 |
+| Jetson → 스마트폰 알림 | **Wi-Fi** (ntfy) | 화면이 꺼진 폰도 받아야 하는 알림 (폰 사이렌, 외출 알림) |
+
+> **같은 방 = Bluetooth / 다른 공간 = Wi-Fi / 물건에 붙는 장치 = BLE**
+
+Jetson의 Bluetooth·BLE는 USB Bluetooth 4.0 동글(CSR8510)을 사용합니다.
+
+### MQTT 토픽
+
+Wi-Fi 노드는 Jetson의 MQTT 브로커(Mosquitto)를 통해 이벤트와 명령을 주고받습니다.  
+새 노드는 Wi-Fi + MQTT 토픽 구독만으로 추가할 수 있습니다.
+
+| 토픽 | 방향 | 내용 |
+|---|---|---|
+| `retrace/entrance/motion` | 출입 노드 → Jetson | 움직임 감지 |
+| `retrace/entrance/light` | Jetson → 출입 노드 | `NORMAL` / `ALERT` |
+
+> 메시지 세부 형식은 `docs/protocol.md`에서 확정 예정입니다.
 
 ---
 
 ## 하드웨어 역할
 
-### Jetson Nano
+### 메인 유닛 – Jetson Nano
 
-시스템의 중앙 처리 장치입니다.
+시스템의 허브(중앙 처리 장치)입니다.
 
 담당 기능:
 
 - 카메라 영상 입력
-- YOLO 객체 탐지
-- OpenCV 영상 처리
+- YOLO 객체 탐지 / OpenCV 영상 처리
 - Last Seen 판단 및 기록
-- DB 저장
-- 이미지 저장
+- DB / 이미지 저장
 - Web/PWA 서버
-- Arduino 통신
-- STM32 통신
+- MQTT 브로커
+- ntfy 알림 서버 (폰 사이렌, 외출 알림)
+- STM32 통신 (USB Serial)
+- 서랍 노드 통신 (Bluetooth)
+- 부저 태그 통신 (BLE)
 
 ---
 
-### Arduino Uno
+### 메인 유닛 – STM32 NUCLEO-F411RE
 
-**스마트 서랍 영역**을 담당합니다.
+카메라와 한 몸체로 고정된 **레이저 헤드**입니다.
+
+담당 기능:
+
+- Pan / Tilt 서보 제어
+- 레이저 ON/OFF
+- PIR 센서 입력
+- Jetson과 통신 (USB Serial)
+
+```text
+STM32
+├─ Pan Servo
+├─ Tilt Servo
+├─ Laser
+└─ PIR
+```
+
+핀 배정은 [STM32 핀맵](docs/stm32_pinmap.md)을 참고합니다.
+
+---
+
+### 서랍 노드 – Arduino Uno
+
+**스마트 서랍**을 담당합니다.
 
 담당 기능:
 
 - 서랍 LED ×6 제어
-- 서랍 팝업 서보 제어
+- 서랍 팝업 서보 ×6 제어
 - 비상 버튼 입력
-- Jetson과 통신
+- Jetson과 통신 (HC-06 Bluetooth)
 
 ```text
 Arduino
 ├─ Drawer LED ×6
-├─ Drawer Popup Servo
-└─ Emergency Button
+├─ Drawer Popup Servo ×6
+├─ Emergency Button
+└─ HC-06 (Bluetooth)
 ```
 
-Jetson ↔ Arduino 통신은  
-**HC-06 Bluetooth** 방식을 사용합니다.
+> Arduino TX(5V) → HC-06 RX(3.3V) 사이에는 전압 분배 저항을 사용합니다.
 
 ---
 
-### STM32 NUCLEO-F411RE
+### 출입 노드 – LOLIN D32 (ESP32)
 
-**카메라/상단 장치 영역**을 담당합니다.
+**스마트 현관등**입니다.
 
 담당 기능:
 
-- PIR 센서 입력
-- Pan 서보 제어
-- Tilt 서보 제어
-- 레이저 ON/OFF
-- Jetson과 통신
+- PIR로 외출 감지
+- 현관등 점등 (평소) / 경고 점등 (물건 두고 나갈 때)
+- Jetson과 통신 (Wi-Fi, MQTT)
 
 ```text
-STM32
+LOLIN D32
 ├─ PIR
-├─ Pan Servo
-├─ Tilt Servo
-└─ Laser
+└─ LED (현관등)
 ```
 
-Jetson ↔ STM32 개발 통신은  
-**NUCLEO ST-LINK USB Serial(VCP)** 방식을 우선 사용합니다.
+---
+
+### 부저 태그 – ESP32-C3
+
+중요 물건에 부착하는 **BLE 부저 태그**입니다.
+
+담당 기능:
+
+- Jetson의 BLE 신호 수신
+- 부저 울림
 
 ---
 
@@ -227,67 +327,90 @@ Jetson ↔ STM32 개발 통신은
 ```text
 Camera
    ↓
-Jetson Nano
-   ↓
-YOLO / OpenCV
+Jetson Nano (YOLO / OpenCV)
    ↓
 객체 탐지
    ↓
 Last Seen 갱신
    ↓
-DB + Image 저장
+DB + 스냅샷 저장
 ```
 
 ### 레이저 위치 안내
 
 ```text
 Web / PWA
-   ↓
+   ↓ HTTP
 Jetson Nano
-   ↓
+   ↓ USB Serial
 STM32
    ↓
-Pan/Tilt 이동
-   ↓
-Laser ON
+Pan/Tilt 이동 → Laser ON
 ```
 
 ### 스마트 서랍
 
 ```text
 Web / PWA
-   ↓
+   ↓ HTTP
 Jetson Nano
-   ↓
+   ↓ Bluetooth
 Arduino
    ↓
-해당 서랍 LED ON
+해당 서랍 LED ON → Drawer Servo 동작
    ↓
-Drawer Servo 동작
+일정 시간 후 LED 자동 OFF
 ```
 
-### PIR 감지
+### PIR 활동 감지
 
 ```text
 PIR
  ↓
 STM32
- ↓
+ ↓ USB Serial
 Jetson Nano
  ↓
-활동 상태 판단
+분석 활성 / 대기 판단
 ```
 
 ### 비상 버튼
 
 ```text
 Emergency Button
-       ↓
-    Arduino
-       ↓
-  Jetson Nano
-       ↓
-스마트폰 찾기 요청
+   ↓
+Arduino
+   ↓ Bluetooth
+Jetson Nano (ntfy 서버)
+   ↓ Wi-Fi
+스마트폰 ntfy 앱
+   ↓
+폰 사이렌 (알림음 반복)
+```
+
+### 외출 알림 (스마트 현관등)
+
+```text
+출입 노드 PIR 감지
+   ↓ MQTT (retrace/entrance/motion)
+Jetson Nano
+   ↓
+차키 Last Seen 확인 → 아직 책상에 있음
+   ├─ MQTT (retrace/entrance/light: ALERT) → 현관등 경고 점등
+   ├─ USB Serial → STM32 레이저로 차키 안내
+   └─ ntfy → 폰 알림 "차키 챙기셨나요?"
+```
+
+### BLE 부저
+
+```text
+Web / PWA
+   ↓ HTTP
+Jetson Nano
+   ↓ BLE
+부저 태그 (ESP32-C3)
+   ↓
+부저 울림
 ```
 
 ---
@@ -297,17 +420,23 @@ Emergency Button
 ```text
 Retrace-Project/
 │
-├─ arduino/                          # 스마트 서랍 영역
+├─ arduino/                          # 서랍 노드 (Arduino Uno)
 │  ├─ arduino.ino                    # setup() / loop(), 전체 흐름
 │  └─ src/
 │     ├─ drawer/
-│     │  └─ DrawerController.h/.cpp  # 서랍 LED ×6, 팝업 서보 제어
+│     │  └─ DrawerController.h/.cpp  # 서랍 LED ×6, 팝업 서보 ×6 제어
 │     ├─ button/
 │     │  └─ EmergencyButton.h/.cpp   # 비상 버튼 입력
 │     └─ communication/
-│        └─ Communication.h/.cpp     # ← Jetson: 서랍 명령 / → Jetson: 비상 버튼 이벤트
+│        └─ Communication.h/.cpp     # HC-06 Bluetooth ↔ Jetson
 │
-├─ jetson_nano/                      # 중앙 처리 (C/C++)
+├─ esp32/                            # ESP32 노드 (Arduino IDE)
+│  ├─ entrance_node/                 # 출입 노드 · 스마트 현관등 (LOLIN D32)
+│  │  └─ entrance_node.ino           # PIR · LED · Wi-Fi · MQTT
+│  └─ buzzer_tag/                    # 부저 태그 (ESP32-C3)
+│     └─ buzzer_tag.ino              # BLE 수신 · 부저
+│
+├─ jetson_nano/                      # 허브 (C/C++)
 │  ├─ main.cpp
 │  ├─ CMakeLists.txt
 │  ├─ vision/
@@ -316,14 +445,17 @@ Retrace-Project/
 │  │  └─ LastSeen.h/.cpp             # 마지막 목격 정보 생성 · 관리
 │  ├─ storage/
 │  │  ├─ Database.h/.cpp             # DB 저장
-│  │  └─ ImageStorage.h/.cpp         # 이미지 저장
+│  │  └─ ImageStorage.h/.cpp         # 스냅샷 저장
 │  ├─ communication/
-│  │  ├─ ArduinoLink.h/.cpp          # → 서랍 명령 / ← 비상 버튼 이벤트
-│  │  └─ Stm32Link.h/.cpp            # → Pan/Tilt · 레이저 명령 / ← PIR 이벤트
+│  │  ├─ Stm32Link.h/.cpp            # USB Serial → AIM · 레이저 명령 / ← PIR 이벤트
+│  │  ├─ ArduinoLink.h/.cpp          # Bluetooth → 서랍 명령 / ← 비상 버튼 이벤트
+│  │  ├─ MqttLink.h/.cpp             # MQTT ↔ 출입 노드 (움직임 · 현관등)
+│  │  ├─ BleBuzzer.h/.cpp            # BLE → 부저 태그 호출
+│  │  └─ PhoneNotifier.h/.cpp        # ntfy → 폰 사이렌 · 외출 알림
 │  └─ server/
 │     └─ Server.h/.cpp               # Web/PWA 요청 처리
 │
-├─ stm32/                            # 카메라 · 상단 장치 영역 (CubeMX + CMake)
+├─ stm32/                            # 레이저 헤드 (CubeMX + CMake)
 │  ├─ Core/
 │  │  ├─ Inc/                        # 헤더 (아래 Src와 짝)
 │  │  └─ Src/
@@ -336,12 +468,14 @@ Retrace-Project/
 │  ├─ cmake/
 │  ├─ CMakeLists.txt
 │  ├─ CMakePresets.json
-│  ├─ Retrace_STM32.ioc              # CubeMX 설정 (핀맵: docs/stm32_pinmap.md)
+│  ├─ Retrace_STM32.ioc              # CubeMX 설정
 │  ├─ startup_stm32f411xe.s
 │  └─ STM32F411xx_FLASH.ld
 │
 ├─ web/                              # 사용자 Web / PWA
 ├─ docs/                             # 회로도 · 구성도 · 개발 문서
+├─ .github/
+│  └─ CODEOWNERS
 ├─ .gitattributes
 ├─ .gitignore
 └─ README.md
