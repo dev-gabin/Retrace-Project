@@ -41,6 +41,7 @@ runs/
 # Environment / Logs
 # =========================
 .env
+/esp32/entrance_node/include/network_config.h
 *.log
 
 # =========================
