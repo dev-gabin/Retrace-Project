@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f6f2">
+  <meta name="description" content="물건의 마지막 목격 정보를 확인하고 레이저·서랍·부저로 찾아보세요.">
+  <title>Retrace — 물건 찾기</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23d65d32'/%3E%3Cpath d='M9 9h8a5 5 0 010 10h-3l7 7M9 23V9' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+    <symbol id="icon-key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="4.5"/><path d="m11.5 11.5 9 9m-3-3 2.5-2.5M15 15l2.5-2.5"/></symbol>
+    <symbol id="icon-airpods" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="4"/><path d="M5 16h14M8 8V4a2 2 0 0 1 4 0v2M16 8V4a2 2 0 0 0-4 0"/></symbol>
+    <symbol id="icon-glasses" viewBox="0 0 24 24"><rect x="2" y="10" width="8" height="6" rx="2"/><rect x="14" y="10" width="8" height="6" rx="2"/><path d="M10 12h4M2 12l2-6M22 12l-2-6"/></symbol>
+    <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/></symbol>
+    <symbol id="icon-drawer" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18M3 15h18M10 6h4m-4 6h4m-4 6h4"/></symbol>
+    <symbol id="icon-sound" viewBox="0 0 24 24"><path d="m11 4-6 5H2v6h3l6 5V4m5 4a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="3"/></symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6 7a7 7 0 0 1 12-1l2 3M4 15l2 3a7 7 0 0 0 12-1"/></symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+    <symbol id="icon-pin" viewBox="0 0 24 24"><path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0Z"/><circle cx="12" cy="10" r="2"/></symbol>
+    <symbol id="icon-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/></symbol>
+    <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 10v7m0-10v.1"/></symbol>
+    <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-7 5 8"/></symbol>
+  </svg>
+  <a class="skip-link" href="#main">본문으로 이동</a>
+  <header class="app-header">
+    <div class="header-inner">
+      <a class="brand" href="#main" aria-label="Retrace 물건 찾기 홈"><span class="brand-mark">R<span></span></span><span>retrace<span class="brand-dot">.</span></span></a>
+      <nav class="main-nav" aria-label="주요 메뉴"><a href="#items" aria-current="page">물건 찾기</a><a href="#drawer">서랍</a><a href="#buzzer">부저</a></nav>
+      <span class="mode-chip" id="mode-chip"><span class="status-dot"></span>샘플 미리보기</span>
+    </div>
+  </header>
+  <main id="main" class="page">
+    <section class="page-intro" aria-labelledby="page-title">
+      <div><p class="eyebrow">A LITTLE HELP, RIGHT WHERE YOU LEFT IT</p><h1 id="page-title">어디 두었는지, 함께 찾아볼까요?</h1><p class="intro-copy">마지막으로 보인 순간부터 차근차근 찾아보세요.</p></div>
+      <button id="refresh-button" class="button button-secondary" type="button" aria-label="기록 새로고침"><svg class="icon" aria-hidden="true"><use href="#icon-refresh"/></svg><span>기록 새로고침</span></button>
+    </section>
+    <div class="demo-notice" id="mode-notice"><svg class="icon" aria-hidden="true"><use href="#icon-info"/></svg><p><strong id="mode-notice-title">지금은 샘플 데이터예요.</strong> <span id="mode-notice-copy">기기 연결 없이 화면 동작을 확인할 수 있어요.</span></p></div>
+    <div id="load-error" class="error-notice" role="alert" hidden></div>
+    <div class="workspace">
+      <div class="find-column">
+        <section id="items" class="items-section" aria-labelledby="items-title">
+          <div class="section-heading"><h2 id="items-title">내 물건 <span id="item-count" class="count">—</span></h2><span class="section-caption">하나를 선택해 찾아보세요</span></div>
+          <label class="search-field"><svg class="icon" aria-hidden="true"><use href="#icon-search"/></svg><span class="visually-hidden">물건 이름 검색</span><input id="search-input" type="search" placeholder="어떤 물건을 찾고 있나요?" autocomplete="off"></label>
+          <div id="item-list" class="item-list" aria-busy="true"></div>
+          <p id="list-message" class="list-message" role="status">물건 기록을 불러오는 중이에요.</p>
+        </section>
+        <section class="detail-card" id="detail-card" aria-labelledby="detail-title" aria-busy="true">
+          <div class="detail-heading"><div><p class="eyebrow">LAST SEEN</p><h2 id="detail-title">마지막으로 보인 곳</h2></div><span id="record-state" class="record-state">기록 확인 중</span></div>
+          <div class="scene" id="scene">
+            <img id="snapshot-image" alt="" hidden>
+            <div class="photo-empty" id="photo-empty"><svg class="icon" aria-hidden="true"><use href="#icon-image"/></svg><strong id="photo-empty-title">기록을 확인해 주세요</strong><span>물건을 선택하면 마지막 목격 정보가 보여요.</span></div>
+            <span class="scene-label" id="scene-label" hidden>샘플 장면</span>
+            <span class="scene-target" id="scene-target" hidden><span></span><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span id="target-label">차키</span></span>
+          </div>
+          <div class="detail-body"><div class="selected-summary"><div><h3 id="selected-name">물건을 선택해 주세요</h3><p id="selected-location">마지막 기록을 확인할 수 있어요.</p></div><span id="relative-time" class="time-pill">—</span></div>
+            <dl class="record-metadata"><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg>마지막 목격</dt><dd id="seen-at">—</dd></div><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-pin"/></svg>기록 위치</dt><dd id="record-location">—</dd></div></dl>
+            <button class="button button-primary detail-action" id="aim-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span>레이저로 위치 안내</span><svg class="icon action-arrow" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+            <button class="text-button" id="related-drawer-button" type="button" hidden>기록된 서랍 선택하기</button>
+            <p class="action-help" id="aim-help">선택한 물건의 마지막 위치로 안내를 요청해요.</p>
+          </div>
+        </section>
+      </div>
+      <aside class="controls-column" aria-label="찾기 도구">
+        <section class="tool-card drawer-card" id="drawer" aria-labelledby="drawer-title">
+          <div class="tool-title"><span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#icon-drawer"/></svg></span><div><p class="eyebrow">SMART DRAWER</p><h2 id="drawer-title">서랍에서 찾기</h2></div></div>
+          <p class="tool-copy">찾고 싶은 서랍을 선택해 살짝 열어보세요.</p>
+          <div class="drawer-orientation" aria-hidden="true"><span>왼쪽</span><span>오른쪽</span></div>
+          <div class="drawer-grid" aria-label="서랍 번호 선택">
+            <button type="button" class="drawer-cell is-selected" data-drawer="1" aria-pressed="true" aria-label="1번 서랍, 상단 왼쪽"><span>01</span><i></i></button>
+            <button type="button" class="drawer-cell" data-drawer="2" aria-pressed="false" aria-label="2번 서랍, 상단 오른쪽"><span>02</span><i></i></button>
+            <button type="button" class="drawer-cell" data-drawer="3" aria-pressed="false" aria-label="3번 서랍, 중단 왼쪽"><span>03</span><i></i></button>
+            <button type="button" class="drawer-cell" data-drawer="4" aria-pressed="false" aria-label="4번 서랍, 중단 오른쪽"><span>04</span><i></i></button>
+            <button type="button" class="drawer-cell" data-drawer="5" aria-pressed="false" aria-label="5번 서랍, 하단 왼쪽"><span>05</span><i></i></button>
+            <button type="button" class="drawer-cell" data-drawer="6" aria-pressed="false" aria-label="6번 서랍, 하단 오른쪽"><span>06</span><i></i></button>
+          </div>
+          <button id="drawer-open-button" class="button button-secondary full-width" type="button"><span>1번 서랍 열기</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+          <p class="tool-footnote">서랍은 자동으로 닫히지 않아요.</p>
+        </section>
+        <section class="tool-card buzzer-card" id="buzzer" aria-labelledby="buzzer-title">
+          <div class="tool-title"><span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#icon-sound"/></svg></span><div><p class="eyebrow">BUZZER TAG 01</p><h2 id="buzzer-title">소리로 찾기</h2></div><span class="sound-bars" id="sound-bars" aria-hidden="true"><i></i><i></i><i></i></span></div>
+          <p class="tool-copy">눈에 보이지 않아도 괜찮아요.<br>소리를 따라 물건을 찾아보세요.</p>
+          <p class="buzzer-status" id="buzzer-status">샘플 · 소리는 나지 않아요</p>
+          <div class="buzzer-actions"><button id="buzzer-on-button" class="button button-primary" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-sound"/></svg>찾기</button><button id="buzzer-off-button" class="button button-dark-outline" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-stop"/></svg>소리 끄기</button></div>
+          <p class="tool-footnote">물건을 찾으면 소리를 직접 꺼주세요.</p>
+        </section>
+        <section class="activity-card" aria-labelledby="activity-title"><div class="section-heading"><h2 id="activity-title">최근 요청</h2><span class="section-caption">이번 화면에서</span></div><ol id="activity-list" class="activity-list"><li class="activity-empty">아직 보낸 요청이 없어요.</li></ol></section>
+      </aside>
+    </div>
+    <footer class="page-footer"><span>retrace<span class="brand-dot">.</span> <span class="footer-copy">작은 기억이, 다시 찾는 순간으로.</span></span><span id="footer-mode">샘플 미리보기 · 실제 기기 제어 없음</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <noscript><p class="error-notice">화면 동작을 확인하려면 JavaScript를 켜주세요.</p></noscript>
+</body>
+</html>

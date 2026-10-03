@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 340" role="img" aria-label="책상 위 차키와 안경을 표현한 샘플 장면">
+  <defs><linearGradient id="wall" x2="0" y2="1"><stop stop-color="#e8e5db"/><stop offset="1" stop-color="#d9d6c8"/></linearGradient><linearGradient id="desk" x2="0" y2="1"><stop stop-color="#cfb99b"/><stop offset="1" stop-color="#a89278"/></linearGradient><filter id="shadow"><feDropShadow dy="4" stdDeviation="5" flood-color="#454939" flood-opacity=".13"/></filter></defs>
+  <rect width="640" height="340" fill="url(#wall)"/>
+  <path d="M0 230 640 210v130H0Z" fill="url(#desk)"/>
+  <path d="m0 250 640-22M0 287l640-20M0 322l640-17" stroke="#bca486" stroke-width="1" opacity=".45"/>
+  <rect x="324" y="28" width="250" height="145" rx="3" fill="#f5f4ea" filter="url(#shadow)"/>
+  <rect x="337" y="41" width="224" height="119" fill="#bdc7b4"/>
+  <path d="m337 127 74-56 61 47 35-24 54 38v28H337Z" fill="#a6b99c"/><path d="m337 139 101-36 56 32 67-24v49H337Z" fill="#82997e"/>
+  <path d="M459 41v119" stroke="#f5f4ea" stroke-width="7"/><path d="M337 101h224" stroke="#f5f4ea" stroke-width="7"/>
+  <rect x="71" y="48" width="181" height="12" rx="2" fill="#a7977d" filter="url(#shadow)"/>
+  <rect x="89" y="12" width="19" height="36" rx="2" fill="#aab292"/><rect x="111" y="17" width="14" height="31" rx="2" fill="#e0c5a7"/><rect x="128" y="9" width="25" height="39" rx="2" fill="#87968c"/>
+  <rect x="159" y="20" width="34" height="28" rx="4" fill="#e3ddd0"/><path d="M173 20c-18-12-16-28-6-17 4-21 16-13 9 8 14-18 23-3 1 11" fill="#7e9171"/>
+  <ellipse cx="110" cy="242" rx="49" ry="11" fill="#6d6b5520"/>
+  <path d="m90 174 38-1 7 60c1 14-51 16-50 0Z" fill="#e7e2d5" filter="url(#shadow)"/>
+  <path d="M108 186c-1-46-31-62-24-83 16-6 29 33 24 83m2-30c-3-42 14-67 28-64 15 19-19 36-28 64m0 25c0-40 35-53 44-40 4 24-31 21-44 40m-3-30c-23-22-39-22-44-11-2 23 32 29 44 11" fill="#748968"/>
+  <ellipse cx="111" cy="175" rx="19" ry="5" fill="#c2c0aa"/>
+  <g filter="url(#shadow)"><path d="m231 223 94-8 57 31-103 11Z" fill="#edeade"/><path d="m232 224 47 34v10l-47-31Z" fill="#cfcec0"/><path d="m279 258 103-12v10l-103 12Z" fill="#f8f6ed"/><path d="m240 209 78-6 57 31-94 10Z" fill="#82908a"/><path d="m241 210 40 35v8l-40-30Z" fill="#5d7268"/></g>
+  <g filter="url(#shadow)"><ellipse cx="506" cy="252" rx="29" ry="9" fill="#aea791"/><path d="M482 208h44v40c0 13-44 13-44 0Z" fill="#ecece2"/><path d="M526 214c33-5 31 31-1 29" fill="none" stroke="#e6e5db" stroke-width="8"/><ellipse cx="504" cy="208" rx="22" ry="6" fill="#d4d4c5"/><ellipse cx="504" cy="208" rx="17" ry="4" fill="#746c57"/></g>
+  <g stroke="#48554e" stroke-width="3" fill="none" transform="rotate(-9 172 224)" filter="url(#shadow)"><rect x="147" y="215" width="22" height="14" rx="5"/><rect x="175" y="215" width="22" height="14" rx="5"/><path d="M169 220h6m-28 1-9-6m59 6 9-6"/></g>
+  <g transform="translate(412 288) rotate(-27)" filter="url(#shadow)"><ellipse cx="-4" cy="-3" rx="13" ry="8" fill="none" stroke="#7b8376" stroke-width="3"/><rect x="-3" y="-13" width="19" height="23" rx="7" fill="#394a41"/><circle cx="7" cy="-6" r="3" fill="#a6ad9e"/><path d="M-12 4v21h5v-4h4v-5h-4V4" fill="#c9c8b3" stroke="#838b77" stroke-width="1"/></g>
+  <path d="M0 334h640" stroke="#95856e" stroke-width="12"/>
+</svg>

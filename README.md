@@ -488,7 +488,17 @@ Retrace-Project/
 │     ├─ tests/                      # 두 STM32 보드 PC 테스트 실행
 │     └─ ...                         # CubeMX 생성 (Drivers, cmake, .ioc 등)
 │
-├─ web/                              # 사용자 Web / PWA
+├─ web/                              # feature/web: 정적 웹 뼈대 (기본 샘플 모드)
+│  ├─ index.html                     # 물건 찾기 · 서랍 · 부저 화면
+│  ├─ styles.css                     # PC · 휴대폰 레이아웃
+│  ├─ app.js                         # 검색 · 선택 · 요청 · 오류 표시
+│  ├─ api.js                         # 기존 HTTP 경로 · 응답 검사 · 시간 초과
+│  ├─ config.js                      # 샘플/실제 모드 · 서버 주소
+│  ├─ demo-data.js                   # 샘플 기록 (실제 요청 없음)
+│  ├─ assets/demo-scene.svg           # 샘플 장면
+│  ├─ dev-server.mjs                 # 로컬 정적 미리보기 서버
+│  ├─ tests/api.test.mjs              # API 계약 · 실패 처리 검증
+│  └─ README.md                      # 실행 · Jetson 연결 인계
 ├─ docs/                             # 회로도 · 구성도 · 개발 문서
 ├─ .github/
 │  └─ CODEOWNERS
@@ -498,7 +508,7 @@ Retrace-Project/
 └─ README.md
 ```
 
-> 위 구조는 각 담당 feature의 완료 펌웨어 기준입니다. 아직 기능을 develop에 통합하지 않았으므로 한 feature 체크아웃에 다른 feature의 완성 코드가 모두 있는 것은 아닙니다. Jetson·웹 항목은 담당 모듈 구조이며 구현 완료를 뜻하지 않습니다.
+> 위 구조는 각 담당 feature의 코드 기준입니다. 아직 기능을 develop에 통합하지 않았으므로 한 feature 체크아웃에 다른 feature의 완성 코드가 모두 있는 것은 아닙니다. Jetson 항목은 담당 모듈 구조이며 서버 구현 완료를 뜻하지 않습니다. 웹 뼈대는 `feature/web`에 있고 실제 서버·장치 연동은 대기 중입니다.
 
 ---
 
@@ -508,6 +518,7 @@ Retrace-Project/
 - [통신 프로토콜](docs/protocol.md)
 - [협업 규칙](CONTRIBUTING.md) — feature 단독 검증 후 develop 통합
 - [강의실 통합 테스트](docs/classroom_test_checklist.md) — 레이저 · 서랍 · 현관등 · 부저 · Jetson/웹 연동
+- [웹 뼈대 실행·인계](web/README.md) — `feature/web`에서 샘플 화면 확인, API JSON 임시안과 실제 연결 전환
 
 ---
 
@@ -523,6 +534,10 @@ Retrace-Project/
 | 부저 ESP32 #2 | BLE 1/0, 계속 울림, 연결 해제 시 정지·재광고 | 빌드 성공·경고 0개, PC 테스트 70/70 통과 | 부저 종류·구동, BLE 연결·소리·재연결 |
 
 빌드·PC 테스트는 실제 UART·PWM·무선 통신·배선·기구 동작 확인을 대신하지 않습니다. 실물에서 문제가 발견되면 담당 feature에서 수정하고 재검증합니다.
+
+웹은 `feature/web`에서 차키·에어팟·안경 검색, Last Seen 상세, 레이저 안내 요청, 2열×3행 서랍 선택, 부저 찾기·끄기 화면을 작성했습니다. 기본값은 샘플 모드입니다. 외부 패키지 설치 없이 `node web/dev-server.mjs`로 실행하며, API 경로는 기존 프로토콜을 유지합니다. JSON 형식은 [프로토콜 7-1](docs/protocol.md)에 명시한 임시안으로 Jetson 담당자와 합의가 필요합니다. Jetson 서버·실물 연결은 아직 확인하지 않았습니다.
+
+웹 API 테스트 30/30 통과, PC·휴대폰 360·390px 화면과 키보드 선택을 확인했습니다. 실제 모드의 서버 부재 오류도 확인했으며, 자세한 범위와 미확인 항목은 [웹 인계 문서](web/README.md)에 정리했습니다.
 
 ### 강의실에서 할 일
 
