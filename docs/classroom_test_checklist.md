@@ -8,8 +8,8 @@ STM32 항목은 `feature/stm32`의 `65c1a8d`에 저장된 체크리스트를 가
 
 | 대상 | 펌웨어 위치·브랜치 | 보드 없이 확인한 상태 | 강의실에서 확인할 것 |
 |---|---|---|---|
-| STM32 #1 레이저 | `stm32/laser_head`, `feature/stm32` | 빌드·PC 파서 테스트 완료 (기존 기록) | USB 명령, Pan/Tilt 보정, 레이저, PIR |
-| STM32 #2 서랍 | `stm32/drawer`, `feature/stm32` | 빌드·PC 모의 테스트 완료 (기존 기록) | USB → HC-06, LED, 서보 밀기·복귀, SOS |
+| STM32 #1 레이저 | `stm32/laser_head`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 파서 24/24 통과 | USB 명령, Pan/Tilt 보정, 레이저, PIR |
+| STM32 #2 서랍 | `stm32/drawer`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 모의 테스트 117/117 통과 | USB → HC-06, LED, 서보 밀기·복귀, SOS |
 | ESP32 #1 현관등 | `esp32/entrance_node`, `feature/esp32` | 기본·네트워크 활성화 빌드 성공, PC 테스트 80/80 통과 | 한 색 LED, PIR, Wi-Fi/MQTT, 경고·복귀 |
 | ESP32 #2 부저 | `esp32/buzzer_tag`, `feature/esp32` | 빌드 성공·경고 0개, PC 테스트 70/70 통과 | BLE, 계속 울림, 끄기, 재연결 |
 | Jetson / 웹 연동 | 해당 담당자의 코드 | 별도 구현·검증 필요 | 보드 단독 테스트 후 진행 |
