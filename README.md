@@ -455,6 +455,8 @@ Retrace-Project/
 │  │  │  ├─ Inc/                     # 헤더 (아래 Src와 짝)
 │  │  │  └─ Src/
 │  │  │     ├─ main.c                # CubeMX 생성 (초기화 · 메인 루프)
+│  │  │     ├─ serial_cmd.c          # UART 인터럽트 수신 · 응답
+│  │  │     ├─ cmd_parser.c          # HAL 독립 명령 해석 (PC 테스트 가능)
 │  │  │     ├─ pir_sensor.c          # PIR 입력 처리
 │  │  │     ├─ pan_tilt.c            # Pan/Tilt 서보 PWM
 │  │  │     ├─ laser.c               # 레이저 ON/OFF
@@ -469,12 +471,15 @@ Retrace-Project/
 │  │
 │  └─ drawer/                        # STM32 #2 서랍 노드 (CubeMX + CMake)
 │     ├─ Core/
+│     │  ├─ Inc/                     # 아래 Src와 짝인 헤더
 │     │  └─ Src/
 │     │     ├─ main.c                # CubeMX 생성 (초기화 · 메인 루프)
 │     │     ├─ drawer.c              # 서랍 LED ×6 · 팝업 서보 ×6
 │     │     ├─ emergency_button.c    # 비상 버튼 입력
-│     │     ├─ hc06.c                # HC-06 Bluetooth ↔ Jetson
+│     │     ├─ serial_cmd.c          # HC-06 · USB 수신 큐 및 응답
+│     │     ├─ cmd_parser.c          # HAL 독립 서랍 명령 해석
 │     │     └─ ...                   # 그 외 CubeMX 생성 파일
+│     ├─ tests/                      # MSVC로 두 보드 PC 테스트 실행
 │     └─ ...                         # CubeMX 생성 (Drivers, cmake, .ioc 등)
 │
 ├─ web/                              # 사용자 Web / PWA
@@ -495,6 +500,7 @@ Retrace-Project/
 
 - [핀맵](docs/pinmap.md) — STM32 ×2, ESP32 ×2
 - [통신 프로토콜](docs/protocol.md)
+- [STM32 강의실 테스트](docs/stm32_test_checklist.md) — USB 명령 · 보정 · 실물 검증
 - [협업 규칙](CONTRIBUTING.md) — 브랜치 · 작업 순서 · 커밋 메시지
 
 ---

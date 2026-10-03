@@ -21,7 +21,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "serial_cmd.h"
+#include "cmd_parser.h"
+#include "drawer.h"
+#include "emergency_button.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,7 +66,27 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+static void process_port(UART_HandleTypeDef *uart)
+{
+  char line[SERIAL_LINE_MAX], reply[SERIAL_LINE_MAX];
+  SerialLineStatus status = serial_cmd_read_line(uart, line);
+  if (status == SERIAL_LINE_TOO_LONG) {
+    serial_cmd_send(uart, "ERR:UNKNOWN");
+  } else if (status == SERIAL_LINE_OK) {
+    Command cmd = {0};
+    ParseResult result = cmd_parse(line, &cmd);
+    if (result == PARSE_OK) {
+      switch (cmd.type) {
+        case CMD_DRAWER: drawer_open(cmd.drawer); break;
+        case CMD_LED: drawer_led(cmd.drawer, cmd.led_on); break;
+        case CMD_LED_ALL_OFF: drawer_led_all_off(); break;
+        case CMD_PING: break;
+      }
+    }
+    cmd_make_reply(result, &cmd, reply, sizeof(reply));
+    serial_cmd_send(uart, reply);
+  }
+}
 /* USER CODE END 0 */
 
 /**
@@ -100,7 +123,10 @@ int main(void)
   MX_TIM4_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  drawer_init(&htim3, &htim4);
+  emergency_button_init();
+  serial_cmd_init(&huart1);
+  serial_cmd_init(&huart2);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -110,6 +136,13 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    drawer_poll();
+    process_port(&huart1);
+    process_port(&huart2);
+    if (emergency_button_poll()) {
+      serial_cmd_send(&huart1, "EVT:BTN:SOS");
+      serial_cmd_send(&huart2, "EVT:BTN:SOS");
+    }
   }
   /* USER CODE END 3 */
 }
