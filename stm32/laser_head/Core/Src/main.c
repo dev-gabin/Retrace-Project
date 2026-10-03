@@ -21,7 +21,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "serial_cmd.h"
+#include "cmd_parser.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define JETSON_UART  (&huart2)    /* Jetson 통신: USART2 = ST-LINK VCP (protocol.md 2장) */
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,7 +55,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void handle_line(const char *line);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -94,7 +95,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
+  serial_cmd_init(JETSON_UART);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,6 +105,14 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    /* 1) Jetson 명령 처리 */
+    char line[SERIAL_LINE_MAX];
+    SerialLineStatus status = serial_cmd_read_line(JETSON_UART, line);
+    if (status == SERIAL_LINE_OK) {
+      handle_line(line);
+    } else if (status == SERIAL_LINE_TOO_LONG) {
+      serial_cmd_send(JETSON_UART, "ERR:UNKNOWN");
+    }
   }
   /* USER CODE END 3 */
 }
@@ -300,7 +309,29 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* 받은 한 줄을 해석 → 실행 → OK / ERR 응답 */
+static void handle_line(const char *line)
+{
+  Command cmd = {0};
+  char reply[SERIAL_LINE_MAX];
+  ParseResult result = cmd_parse(line, &cmd);
 
+  if (result == PARSE_OK) {
+    switch (cmd.type) {
+      case CMD_PING:
+        break;
+      case CMD_AIM:
+        break;
+      case CMD_LASER:
+        break;
+      case CMD_HOME:
+        break;
+    }
+  }
+
+  cmd_make_reply(result, &cmd, reply, sizeof(reply));
+  serial_cmd_send(JETSON_UART, reply);
+}
 /* USER CODE END 4 */
 
 /**
