@@ -163,7 +163,7 @@ Retrace 웹은 검색·제어 화면으로 사용하고, 음성 안내는 **Jets
 │        │           Web Server / MQTT Broker │
 │        │ USB Serial                         │
 │        v                                    │
-│  [ STM32 Laser Head ]                       │
+│  [ STM32 Main Unit ]                        │
 │     Pan/Tilt / Laser / PIR                  │
 │                                             │
 └────┬───────────┬───────────┬───────────┬────┘
@@ -184,7 +184,7 @@ Retrace 웹은 검색·제어 화면으로 사용하고, 음성 안내는 **Jets
 
 | 노드 | 설명 |
 |---|---|
-| Main Unit (Hub) | Jetson Nano + 카메라 + STM32 #1 레이저 헤드를 한 몸체로 구성 |
+| Main Unit (Hub) | Jetson Nano + 카메라 + STM32 #1 메인 유닛 제어 보드를 한 몸체로 구성 |
 | Drawer Node | 스마트 서랍 + 비상 폰 찾기(사이렌) 버튼 (STM32 #2 + HC-06) |
 | Entrance Node | 스마트 현관등 (LOLIN D32 + PIR + LED) |
 | Buzzer Tag | BLE 부저 태그 (ESP32-C3) |
@@ -250,7 +250,7 @@ Wi-Fi 노드는 Jetson의 MQTT 브로커(Mosquitto)를 통해 이벤트와 명�
 
 ### 메인 유닛 – STM32 #1 (NUCLEO-F411RE)
 
-카메라와 한 몸체로 고정된 **레이저 헤드**입니다.
+메인 유닛의 **장치 제어·센서 입력을 담당하는 STM32 보드**입니다. Pan/Tilt와 레이저를 제어하고 PIR 이벤트를 Jetson에 전달합니다. 카메라는 고정하고 레이저만 Pan/Tilt로 움직입니다.
 
 담당 기능:
 
@@ -458,7 +458,7 @@ Retrace-Project/
 │     └─ Server.h/.cpp               # Web/PWA 요청 처리
 │
 ├─ stm32/                            # STM32 프로젝트 묶음
-│  ├─ laser_head/                    # STM32 #1 레이저 헤드 (CubeMX + CMake)
+│  ├─ main_unit/                     # STM32 #1 메인 유닛: 레이저·Pan/Tilt·PIR (CubeMX + CMake)
 │  │  ├─ Core/
 │  │  │  ├─ Inc/                     # 헤더 (아래 Src와 짝)
 │  │  │  └─ Src/
