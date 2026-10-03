@@ -3,8 +3,8 @@
 > 각 보드가 주고받는 메시지 약속입니다. **보내는 쪽과 받는 쪽 모두 이 문서를 기준으로 구현합니다.**  
 > 문서와 다르게 동작하면 **문서와 다른 쪽이 수정**합니다. 변경이 필요하면 문서를 먼저 고치고 서로 공유합니다.
 >
-> 상태: **초안 v0.5** (확정 필요 항목은 맨 아래 참고)
-> 보드 핀 배정은 [pinmap.md](pinmap.md)를 참고합니다.
+> 상태: **보드 구현 기준 v0.5** — 네 보드 작성·빌드·PC 테스트 완료, 실물·Jetson/웹 통합 검증 전. HTTP API·DB 등 허브 측 항목은 초안입니다. 남은 확정 항목은 맨 아래 참고합니다.
+> 보드 핀 배정은 [pinmap.md](pinmap.md), 실행·검증 항목은 [통합 테스트 체크리스트](classroom_test_checklist.md)를 참고합니다.
 
 ---
 
@@ -137,8 +137,8 @@ STM32  → EVT:PIR:1
 | `LED:ALL:OFF` | `OK:LED` | 전체 LED 끄기 |
 
 - 범위 밖 번호 → `ERR:DRAWER:RANGE`, `ERR:LED:RANGE`
-- 서보 각도(밀어내기·복귀)는 **STM32가 처리**합니다. Jetson은 서랍 번호만 보냅니다.
-- `DRAWER:OPEN` 후 LED는 **STM32가 타이머로 자동 소등**합니다 (Jetson이 끄지 않아도 됨).
+- 서보 밀어내기·복귀는 **STM32가 처리**합니다. Jetson은 서랍 번호만 보냅니다. 현재 밀기 2000µs / 복귀 1000µs, 각각 500ms이며 실물 보정 전 임시값입니다. 복귀는 서보 팔 복귀이며 서랍을 자동으로 닫지 않습니다.
+- LED 점등 명령 이후 마지막 점등 시각부터 현재 **10초** 뒤 STM32가 자동 소등합니다. 서랍 닫힘 감지는 없습니다. 시간은 강의실에서 조정합니다.
 - 새 `DRAWER:OPEN`이 오면 **이전 LED는 즉시 소등**하고 새 서랍만 켭니다.
 - 서보는 한 번에 하나만 구동합니다. 동작 중 새 요청을 받으면 기존 서보를 복귀시키고 새 서랍을 구동합니다. 복귀 중 여러 요청이 오면 마지막 요청을 예약합니다 (`OK:DRAWER`는 요청 접수 응답).
 
@@ -194,7 +194,7 @@ STM32  → EVT:BTN:SOS
 
 ```bash
 mosquitto_sub -h localhost -t "retrace/#" -v
-mosquitto_pub -h localhost -t retrace/entrance/light -m ALERT
+mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m ALERT
 ```
 
 ---
@@ -259,7 +259,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 | POST | `/api/buzzer` | 부저 태그 호출 |
 | GET | `/snapshots/{file}` | 스냅샷 이미지 |
 
-> 응답 형식(JSON 필드)은 Jetson 담당이 확정합니다.
+> 응답 형식(JSON 필드)은 Jetson 담당이 확정합니다. 부저 API는 찾기뿐 아니라 소리 끄기 요청도 BLE `0`으로 이어져야 하며, 요청 본문·경로는 Jetson·웹 담당자가 확정합니다. 위 표는 보드 펌웨어 작성 완료와 별개인 허브 측 초안입니다.
 
 ---
 
@@ -290,7 +290,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 ## 확정 필요 항목
 
 - [ ] HC-06 실제 통신 속도 (기본 9600인지 모듈 확인)
-- [ ] 서랍 LED 자동 소등 시간 / 현관등 ALERT 유지 시간
+- [ ] 서랍 LED 10초 소등 / 현관등 기본 점등 10초·ALERT 10초·깜빡임 250ms를 실물에 맞춰 보정
 - [ ] ntfy 서버 포트
 - [ ] HTTP API 응답 JSON 형식
 - [ ] 추적 물건 목록 최종 확정 (안경 / 지갑)
