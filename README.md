@@ -481,6 +481,7 @@ Retrace-Project/
 ├─ docs/                             # 회로도 · 구성도 · 개발 문서
 ├─ .github/
 │  └─ CODEOWNERS
+├─ CONTRIBUTING.md                   # 협업 규칙
 ├─ .gitattributes
 ├─ .gitignore
 └─ README.md
@@ -494,6 +495,7 @@ Retrace-Project/
 
 - [핀맵](docs/pinmap.md) — STM32 ×2, ESP32 ×2
 - [통신 프로토콜](docs/protocol.md)
+- [협업 규칙](CONTRIBUTING.md) — 브랜치 · 작업 순서 · 커밋 메시지
 
 ---
 
