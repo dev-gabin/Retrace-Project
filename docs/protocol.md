@@ -261,6 +261,45 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 
 > 응답 형식(JSON 필드)은 Jetson 담당이 확정합니다. 부저 API는 찾기뿐 아니라 소리 끄기 요청도 BLE `0`으로 이어져야 하며, 요청 본문·경로는 Jetson·웹 담당자가 확정합니다. 위 표는 보드 펌웨어 작성 완료와 별개인 허브 측 초안입니다.
 
+### 7-1. 웹 뼈대에서 사용하는 JSON 임시안
+
+`feature/web`의 화면과 샘플 데이터는 아래 형식을 사용합니다. **기존 메서드·경로는 유지하며, 아래 JSON은 Jetson 담당자 합의 전 임시안입니다.** 서버에 이미 다른 형식이 있다면 이 문서와 `web/api.js`를 함께 맞춥니다. Jetson 서버 구현 완료를 의미하지 않습니다.
+
+| 요청 | 요청 본문 | 성공 응답 (HTTP 200) |
+|---|---|---|
+| `GET /api/items` | 없음 | `{ "items": [LastSeen, ...] }` |
+| `GET /api/items/{item}` | 없음 | `LastSeen` 객체 |
+| `POST /api/items/{item}/aim` | `{}` | `{ "ok": true }` |
+| `POST /api/drawers/{n}/open` | `{}` | `{ "ok": true }` |
+| `POST /api/buzzer` | `{ "enabled": true }` 또는 `{ "enabled": false }` | `{ "ok": true }` |
+
+POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=true`는 BLE ASCII `1`, `false`는 ASCII `0`으로 Jetson이 변환합니다. 웹은 UART·MQTT·BLE를 직접 제어하지 않습니다. 레이저 요청은 물건 ID만 보내며 목표 각도는 Jetson이 계산합니다.
+
+`LastSeen` 예제 (8장 필드 이름 사용):
+
+```json
+{
+  "item": "carkey",
+  "pos_x": 412,
+  "pos_y": 288,
+  "seen_at": "2026-10-03T14:22:05+09:00",
+  "snapshot": "snapshots/carkey_20261003_142205.jpg",
+  "drawer_id": null,
+  "state": "visible"
+}
+```
+
+- `item`: `carkey` / `airpods` / `glasses`. 화면 이름은 웹에서 차키 / 에어팟 / 안경으로 표시합니다.
+- `pos_x`, `pos_y`: 이미지 픽셀 좌표, 둘 다 0 이상의 정수 또는 둘 다 `null`.
+- `seen_at`: 시간대가 있는 ISO 8601 문자열 또는 `null`. 기록이 없으면 시간·좌표·사진·서랍 필드를 `null`로 보내고 웹은 기록 없음으로 표시합니다.
+- `snapshot`: `snapshots/` 아래 상대 경로 또는 `null`. 웹은 동일 서버의 `GET /snapshots/{file}`로 표시합니다. 임의 외부 주소나 상위 폴더 경로는 받지 않습니다.
+- `drawer_id`: 1~6 정수 또는 `null`. `state`: `visible` / `occluded` / `uncertain`.
+- `{ "ok": true }`는 **서버의 요청 접수 응답**이며, 실제 서보 이동·레이저 점등·부저 소리 완료를 뜻하지 않습니다. 보드 응답 대기·장치 오류 처리 방식은 Jetson 담당자가 추가로 확정합니다.
+- 실패는 HTTP 4xx/5xx와 `{ "error": { "code": "ITEM_NOT_FOUND", "message": "물건 기록이 없습니다." } }` 형태의 임시안을 사용합니다. 웹은 실패·시간 초과를 표시하며, 실제 연결 실패 시 샘플 성공으로 바꾸지 않습니다.
+- 부저 켜기·끄기는 하나의 태그 기준입니다. 물건마다 별도 태그를 고르는 기능·장치 상태 조회 API는 아직 정의하지 않았습니다.
+
+웹 기본 설정은 샘플 모드이며 실제 API 요청을 보내지 않습니다. 실행·연동 전환·검증 방법은 [feature/web의 웹 인계 문서](https://github.com/dev-gabin/Retrace-Project/blob/feature/web/web/README.md)를 참고합니다. 웹 코드와 인계 문서는 `feature/web`에서 관리하며, 이 프로토콜 문서는 각 브랜치에서 공통으로 공유합니다.
+
 ---
 
 ## 8. DB 형식 (Last Seen)
@@ -292,7 +331,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 - [ ] HC-06 실제 통신 속도 (기본 9600인지 모듈 확인)
 - [ ] 서랍 LED 10초 소등 / 현관등 기본 점등 10초·ALERT 10초·깜빡임 250ms를 실물에 맞춰 보정
 - [ ] ntfy 서버 포트
-- [ ] HTTP API 응답 JSON 형식
+- [ ] HTTP API JSON 임시안(7-1)을 Jetson·웹 담당자가 함께 확정, 장치 오류·완료 응답 방식 정의
 - [ ] 추적 물건 목록 최종 확정 (안경 / 지갑)
 
 ---
