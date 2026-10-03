@@ -500,7 +500,7 @@ Retrace-Project/
 
 - [핀맵](docs/pinmap.md) — STM32 ×2, ESP32 ×2
 - [통신 프로토콜](docs/protocol.md)
-- [STM32 강의실 테스트](docs/stm32_test_checklist.md) — USB 명령 · 보정 · 실물 검증
+- [강의실 통합 테스트](docs/classroom_test_checklist.md) — 레이저 · 서랍 · 현관등 · 부저 · Jetson/웹 연동
 - [협업 규칙](CONTRIBUTING.md) — 브랜치 · 작업 순서 · 커밋 메시지
 
 ---
