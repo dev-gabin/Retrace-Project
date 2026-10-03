@@ -12,7 +12,7 @@
 
 | 연결 | 방식 | 보드 쪽 (담당: 본인) | Jetson 쪽 (담당: 짝꿍) |
 |---|---|---|---|
-| Jetson ↔ STM32 #1 레이저 헤드 | USB Serial (VCP) | `stm32/laser_head` | `Stm32Link` |
+| Jetson ↔ STM32 #1 메인 유닛 | USB Serial (VCP) | `stm32/main_unit` | `Stm32Link` |
 | Jetson ↔ STM32 #2 서랍 | Bluetooth (HC-06) | `stm32/drawer` | `DrawerLink` |
 | Jetson ↔ ESP32 #1 현관등 (LOLIN D32) | Wi-Fi · MQTT | `esp32/entrance_node` | `MqttLink` |
 | Jetson → ESP32 #2 부저 태그 (ESP32-C3) | BLE | `esp32/buzzer_tag` | `BleBuzzer` |
@@ -63,9 +63,9 @@ STM32  → OK:AIM        ← 이게 AIM의 응답
 
 ---
 
-## 2. Jetson ↔ STM32 #1 레이저 헤드 (USB Serial)
+## 2. Jetson ↔ STM32 #1 메인 유닛 (USB Serial)
 
-카메라와 레이저 헤드는 **메인 유닛 한 몸체**라 USB로 연결합니다.
+카메라와 STM32 #1은 **같은 메인 유닛**에 배치하며, STM32 #1과 Jetson은 USB로 연결합니다.
 
 | 항목 | 값 |
 |---|---|

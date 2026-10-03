@@ -40,11 +40,14 @@ feature/jetson ─┘
 git switch feature/본인파트
 ```
 
-**2. 작업 시작 전 `develop` 최신 내용 가져오기**
+**2. 같은 원격 feature의 최신 내용 가져오기**
 
 ```bash
-git pull origin develop
+git status
+git pull --ff-only origin feature/본인파트
 ```
+
+`--ff-only`는 이력이 갈라졌을 때 자동 merge하지 않고 멈춥니다. 기존 수정이나 로컬 커밋을 먼저 확인합니다. `git pull origin develop`은 현재 feature에 develop 내용을 합칠 수 있으므로 일상적인 동기화 명령으로 사용하지 않습니다. develop 변경이 필요한 경우 따로 확인·합의하고 진행합니다.
 
 **3. 작업 → 커밋**
 
@@ -53,26 +56,25 @@ git add <파일>
 git commit -m "Add drawer LED timer"
 ```
 
-**4. `develop`에 반영** (둘 중 하나)
+**4. 자기 feature에 push하고 실물 확인**
 
-- **직접 push**
-  ```bash
-  git pull origin develop
-  git push origin HEAD:develop
-  ```
-  push 직전에 한 번 더 `pull`합니다. 그 사이 상대가 `develop`에 올렸으면 push가 거절(rejected)되기 때문입니다.
+```bash
+git push origin feature/본인파트
+```
 
-- **PR**
-  ```bash
-  git push origin feature/본인파트
-  ```
-  GitHub에서 `feature/*` → `develop` 방향으로 PR 생성 → merge
+완료 코드는 자기 feature에 보존합니다. 강의실에서 해당 feature로 보드를 업로드해 단독 테스트·보정하고, 문제가 있으면 같은 feature에서 수정·재검증·push합니다. 빌드·PC 테스트 성공과 실물 성공을 구분합니다.
+
+**5. 확인된 기능을 develop으로 PR**
+
+GitHub에서 `feature/*` → `develop` PR 생성 → 변경 확인 → merge합니다. develop에서 Jetson·웹·여러 보드의 전체 연동을 확인합니다. 담당 feature는 통합 후에도 후속 수정에 사용할 수 있습니다.
+
+2026-10-03 기준 네 보드 펌웨어는 빌드·PC 테스트까지 완료했으며, 강의실 실물 검증과 기능의 develop 통합은 아직 진행하지 않았습니다. 테스트 결과와 보정값은 [통합 체크리스트](docs/classroom_test_checklist.md)에 기록합니다.
 
 ---
 
 ## 4. `main` 반영
 
-`develop`에서 통합 테스트 후 이상이 없으면, GitHub에서 **`develop` → `main` PR**을 만들어 반영합니다.  
+`develop`에서 통합 테스트 후 이상이 없으면, GitHub에서 **`develop` → `main` PR**을 만들어 반영합니다.
 `main`은 보호 브랜치라 직접 push할 수 없고, 승인 후 merge합니다.
 
 ---
@@ -80,7 +82,8 @@ git commit -m "Add drawer LED timer"
 ## 5. 커밋 메시지
 
 - **영어, 동사로 시작**, 한 줄로 짧게
-- 항상 `-m`을 붙여서 커밋 (`-m` 없이 `git commit`만 하면 Vim 편집기가 열림)
+- 항상 `-m`을 붙여서 커밋 (`-m` 없이 `git commit`만 하면 편집기가 열림)
+- 작성자 정보는 사용자 Git 계정만 사용하며 AI 공동 작성자 표시를 추가하지 않음
 
 | 동사 | 쓰는 경우 | 예 |
 |---|---|---|
@@ -107,4 +110,5 @@ git commit -m "Add drawer LED timer"
 |---|---|---|
 | [docs/protocol.md](docs/protocol.md) | 보드 간 메시지 형식 | 코드와 다르면 **문서 기준**. 바꿀 땐 **문서 먼저 수정**하고 공유 |
 | [docs/pinmap.md](docs/pinmap.md) | 보드별 핀 배정 · 설정 | 핀을 바꾸면 같은 커밋에 문서도 수정 |
-| [README.md](README.md) | 프로젝트 소개 · 구조 | 폴더 구조가 바뀌면 같이 수정 |
+| [README.md](README.md) | 프로젝트 소개 · 구조 · 완료 상태 | 구조·검증 상태가 바뀌면 같이 수정 |
+| [docs/classroom_test_checklist.md](docs/classroom_test_checklist.md) | 네 보드 단독·전체 연동 테스트 | 실제 실행한 항목만 체크하고 실측값 기록 |
