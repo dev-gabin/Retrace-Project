@@ -10,7 +10,7 @@ STM32 항목은 `feature/stm32`의 `3f42ba3`에 저장된 체크리스트를 가
 
 | 대상 | 펌웨어 위치·브랜치 | 보드 없이 확인한 상태 | 강의실에서 확인할 것 |
 |---|---|---|---|
-| STM32 #1 레이저 | `stm32/laser_head`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 파서 24/24 통과 | USB 명령, Pan/Tilt 보정, 레이저, PIR |
+| STM32 #1 메인 유닛 | `stm32/main_unit`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 파서 24/24 통과 | USB 명령, Pan/Tilt 보정, 레이저, PIR |
 | STM32 #2 서랍 | `stm32/drawer`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 모의 테스트 117/117 통과 | USB → HC-06, LED, 서보 밀기·복귀, SOS |
 | ESP32 #1 현관등 | `esp32/entrance_node`, `feature/esp32` | 기본·네트워크 활성화 빌드 성공, PC 테스트 80/80 통과 | 한 색 LED, PIR, Wi-Fi/MQTT, 경고·복귀 |
 | ESP32 #2 부저 | `esp32/buzzer_tag`, `feature/esp32` | 빌드 성공·경고 0개, PC 테스트 70/70 통과 | BLE, 계속 울림, 끄기, 재연결 |
@@ -20,7 +20,7 @@ STM32 항목은 `feature/stm32`의 `3f42ba3`에 저장된 체크리스트를 가
 
 | 연결 | 설정 |
 |---|---|
-| 레이저 USB VCP (USART2) | 115200, 8N1, 대문자 ASCII, 명령 끝 LF (`\n`) |
+| 메인 유닛 USB VCP (USART2) | 115200, 8N1, 대문자 ASCII, 명령 끝 LF (`\n`) |
 | 서랍 USB VCP (USART2, 테스트용) | 115200, 8N1, 같은 시리얼 명령 |
 | 서랍 HC-06 (USART1) | 9600, 8N1 가정. 실제 모듈 속도 확인 |
 | 부저 BLE | Text/UTF-8 한 글자 `1` / `0`, **줄 끝 없음** |
@@ -36,7 +36,7 @@ STM32 항목은 `feature/stm32`의 `3f42ba3`에 저장된 체크리스트를 가
 
 ```powershell
 cmake --build stm32/drawer/build/Debug
-cmake --build stm32/laser_head/build/Debug
+cmake --build stm32/main_unit/build/Debug
 .\stm32\drawer\tests\run_host_tests.cmd
 ```
 
@@ -72,7 +72,7 @@ cmake --build stm32/laser_head/build/Debug
 - 네트워크 활성화 빌드: FLASH **878,049 / 1,310,720바이트 (67.0%)**, 정적 RAM **45,320 / 327,680바이트 (13.8%)**. 실행 중 태스크·Wi-Fi·MQTT 동적 메모리는 실물에서 확인한다.
 - 테스트 통과는 PIR 전압·LED 구동·Wi-Fi 연결·실제 MQTT 발행/구독·Last Will 동작 검증을 대신하지 않는다.
 
-## 3. STM32 #1 레이저 헤드
+## 3. STM32 #1 메인 유닛 (레이저·Pan/Tilt·PIR)
 
 연결: **USB VCP 115200, 8N1**, 명령 끝 LF. 카메라는 고정하고 레이저만 Pan/Tilt로 움직이는 구성이다. 목표 좌표를 각도로 바꾸는 것은 Jetson, 받은 각도를 서보 펄스로 바꾸는 것은 STM32가 담당한다.
 

@@ -5,7 +5,7 @@
 
 | 보드 | 역할 | 프로젝트 폴더 | Jetson 연결 | 상태 |
 |---|---|---|---|---|
-| **STM32 #1** (NUCLEO-F411RE) | 레이저 헤드 (Pan/Tilt 서보, 레이저, PIR) | `stm32/laser_head` | USB Serial (VCP) | 펌웨어·빌드·PC 24/24 완료 / 실물 확인 전 |
+| **STM32 #1** (NUCLEO-F411RE) | 메인 유닛 (Pan/Tilt 서보, 레이저, PIR) | `stm32/main_unit` | USB Serial (VCP) | 펌웨어·빌드·PC 24/24 완료 / 실물 확인 전 |
 | **STM32 #2** (NUCLEO-F411RE) | 서랍 노드 (서보 ×6, LED ×6, 비상 버튼) | `stm32/drawer` | Bluetooth (HC-06) | 펌웨어·빌드·PC 117/117 완료 / 실물 확인 전 |
 | **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25 구현·빌드·PC 80/80 완료 / 실물 확인 전 |
 | **ESP32 #2** (ESP32-C3 Super Mini) | 부저 태그 (부저) | `esp32/buzzer_tag` | BLE | GPIO3 구현·빌드·PC 70/70 완료 / 실물 확인 전 |
@@ -84,7 +84,7 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 |---|---|
 | 에디터 | VS Code + **STM32CubeIDE for Visual Studio Code** 확장 팩 |
 | 도구(번들) | 각 프로젝트 `.settings/bundles-lock.store.json`에 고정된 버전 사용 (CMake, Ninja, gnu-tools-for-stm32 14.3.1) |
-| 열 폴더 | `stm32/laser_head` 또는 `stm32/drawer` (각각 따로 열기) |
+| 열 폴더 | `stm32/main_unit` 또는 `stm32/drawer` (각각 따로 열기) |
 | 빌드 | `F7` (CMake: Build), 프리셋 `Debug` |
 | 성공 기준 | 출력 탭 `CMake/빌드` → `빌드가 완료됨(종료 코드: 0)` |
 
@@ -105,7 +105,7 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 ---
 
-## 2. STM32 #1 레이저 헤드
+## 2. STM32 #1 메인 유닛 (레이저·Pan/Tilt·PIR)
 
 ### 2-1. 담당 기능
 
@@ -271,7 +271,7 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 - TX ↔ RX **교차 연결** (STM32 TX → HC-06 RXD)
 - STM32는 3.3V 로직이라 **전압 분배 저항 없이** 연결
-- 서랍 보드엔 PIR이 없어서 PA10을 USART1_RX로 사용 (레이저 헤드와 다름)
+- 서랍 보드엔 PIR이 없어서 PA10을 USART1_RX로 사용 (메인 유닛 STM32 #1과 다름)
 
 **비상 버튼**
 
@@ -298,7 +298,7 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 | Channel 1~3 | PWM Generation CH1 / CH2 / CH3 (Channel 4 Disable) |
 | Pulse (CH1~3) | **0** (신호 없음 → 전원 켜도 서보가 움직이지 않음) |
 
-> 레이저 헤드는 시작 Pulse 1500(중앙)이며, 서랍 서보는 부팅 시 Pulse 0으로 신호를 보내지 않습니다. 각 서랍 뒤에 설치한 서보의 복귀·밀어내기 펄스 값은 실물 테스트에서 맞춥니다.
+> 메인 유닛의 Pan/Tilt 서보는 시작 Pulse 1500(중앙)이며, 서랍 서보는 부팅 시 Pulse 0으로 신호를 보내지 않습니다. 각 서랍 뒤에 설치한 서보의 복귀·밀어내기 펄스 값은 실물 테스트에서 맞춥니다.
 
 **USART1 (HC-06)**
 
