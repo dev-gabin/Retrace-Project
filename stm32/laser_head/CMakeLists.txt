@@ -48,6 +48,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     Core/Src/serial_cmd.c
     Core/Src/cmd_parser.c
     Core/Src/pan_tilt.c
+    Core/Src/laser.c
 )
 
 # Add include paths
