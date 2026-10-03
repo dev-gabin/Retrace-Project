@@ -12,7 +12,7 @@ if errorlevel 1 goto fail
 test_firmware.exe
 if errorlevel 1 goto fail
 popd
-pushd "%~dp0..\..\laser_head"
+pushd "%~dp0..\..\main_unit"
 if not exist build\host mkdir build\host
 cd build\host
 cl /nologo /W4 /WX /utf-8 /D_CRT_SECURE_NO_WARNINGS /std:c11 /I../../Core/Inc ../../tests/test_cmd_parser.c ../../Core/Src/cmd_parser.c /Fe:test_cmd_parser.exe

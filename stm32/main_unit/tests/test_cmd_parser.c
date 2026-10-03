@@ -1,6 +1,6 @@
 /* cmd_parser PC 테스트 (보드 없이 실행)
  *
- * 빌드 · 실행 (stm32/laser_head 폴더에서):
+ * 빌드 · 실행 (stm32/main_unit 폴더에서):
  *   gcc -I Core/Inc tests/test_cmd_parser.c Core/Src/cmd_parser.c -o test_cmd_parser
  *   ./test_cmd_parser
  */
