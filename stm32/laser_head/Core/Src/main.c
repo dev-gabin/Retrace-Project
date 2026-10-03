@@ -25,6 +25,7 @@
 #include "cmd_parser.h"
 #include "pan_tilt.h"
 #include "laser.h"
+#include "pir_sensor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -99,6 +100,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   laser_off();
   pan_tilt_init(&htim3);
+  pir_sensor_init();
   serial_cmd_init(JETSON_UART);
   /* USER CODE END 2 */
 
@@ -116,6 +118,12 @@ int main(void)
       handle_line(line);
     } else if (status == SERIAL_LINE_TOO_LONG) {
       serial_cmd_send(JETSON_UART, "ERR:UNKNOWN");
+    }
+
+    /* 2) PIR 상태가 바뀌면 이벤트 전송 */
+    int motion;
+    if (pir_sensor_poll(&motion)) {
+      serial_cmd_send(JETSON_UART, motion ? "EVT:PIR:1" : "EVT:PIR:0");
     }
   }
   /* USER CODE END 3 */
@@ -343,6 +351,14 @@ static void handle_line(const char *line)
 
   cmd_make_reply(result, &cmd, reply, sizeof(reply));
   serial_cmd_send(JETSON_UART, reply);
+}
+
+/* EXTI 인터럽트 콜백. PA10(PIR)과 PC13(B1)이 EXTI15_10을 같이 쓰므로 핀으로 구분 (pinmap.md 2-3) */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == PIR_IN_Pin) {
+    pir_sensor_on_exti();
+  }
 }
 /* USER CODE END 4 */
 
