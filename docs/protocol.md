@@ -298,7 +298,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 - 실패는 HTTP 4xx/5xx와 `{ "error": { "code": "ITEM_NOT_FOUND", "message": "물건 기록이 없습니다." } }` 형태의 임시안을 사용합니다. 웹은 실패·시간 초과를 표시하며, 실제 연결 실패 시 샘플 성공으로 바꾸지 않습니다.
 - 부저 켜기·끄기는 하나의 태그 기준입니다. 물건마다 별도 태그를 고르는 기능·장치 상태 조회 API는 아직 정의하지 않았습니다.
 
-웹 기본 설정은 샘플 모드이며 실제 API 요청을 보내지 않습니다. 실행·연동 전환·검증 방법은 [웹 인계 문서](../web/README.md)를 참고합니다.
+웹 기본 설정은 샘플 모드이며 실제 API 요청을 보내지 않습니다. 실행·연동 전환·검증 방법은 [feature/web의 웹 인계 문서](https://github.com/dev-gabin/Retrace-Project/blob/feature/web/web/README.md)를 참고합니다. 웹 코드와 인계 문서는 `feature/web`에서 관리하며, 이 프로토콜 문서는 각 브랜치에서 공통으로 공유합니다.
 
 ---
 
