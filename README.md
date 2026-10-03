@@ -423,12 +423,15 @@ Retrace-Project/
 ├─ esp32/                            # ESP32 노드 (VS Code + PlatformIO)
 │  ├─ entrance_node/                 # 출입 노드 · 스마트 현관등 (LOLIN D32)
 │  │  ├─ platformio.ini              # 보드 · 라이브러리 설정
-│  │  └─ src/
-│  │     └─ main.cpp                 # PIR · LED · Wi-Fi · MQTT
+│  │  ├─ include/entrance_control.h   # PIR 필터 · 센서등 · 경고 타이머
+│  │  ├─ include/network_config.example.h # Wi-Fi · Jetson 주소 설정 예제
+│  │  ├─ src/main.cpp                # PIR GPIO34 · LED GPIO25 · Wi-Fi · MQTT
+│  │  └─ tests/                      # PC 제어 로직 · 네트워크 빌드 검증
 │  └─ buzzer_tag/                    # 부저 태그 (ESP32-C3)
 │     ├─ platformio.ini
-│     └─ src/
-│        └─ main.cpp                 # BLE 수신 · 부저
+│     ├─ include/buzzer_control.h    # ON/OFF 명령 (PC 테스트 가능)
+│     ├─ src/main.cpp                # BLE 수신 · GPIO3 부저
+│     └─ tests/                      # MSVC로 실행하는 PC 로직 테스트
 │
 ├─ jetson_nano/                      # 허브 (C/C++)
 │  ├─ main.cpp
@@ -494,6 +497,7 @@ Retrace-Project/
 
 - [핀맵](docs/pinmap.md) — STM32 ×2, ESP32 ×2
 - [통신 프로토콜](docs/protocol.md)
+- [강의실 통합 테스트](docs/classroom_test_checklist.md) — 레이저 · 서랍 · 현관등 · 부저 · Jetson/웹 연동
 
 ---
 
