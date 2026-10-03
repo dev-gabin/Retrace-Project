@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "serial_cmd.h"
 #include "cmd_parser.h"
+#include "pan_tilt.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -95,6 +96,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
+  pan_tilt_init(&htim3);
   serial_cmd_init(JETSON_UART);
   /* USER CODE END 2 */
 
@@ -321,6 +323,7 @@ static void handle_line(const char *line)
       case CMD_PING:
         break;
       case CMD_AIM:
+        pan_tilt_set(cmd.pan, cmd.tilt);
         break;
       case CMD_LASER:
         break;
