@@ -10,6 +10,7 @@ build/
 **/.vscode/*
 !/.vscode/c_cpp_properties.json
 esp32/*/compile_commands.json
+.cache/
 
 # =========================
 # STM32
