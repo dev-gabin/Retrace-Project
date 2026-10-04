@@ -6,15 +6,11 @@ STM32 항목은 `feature/stm32`의 `3f42ba3`에 저장된 체크리스트를 가
 
 ## 1. 현재 상태와 테스트 순서
 
-네 보드 펌웨어 작성·빌드·PC 테스트는 완료했다. 다음 단계는 강의실 설정·배선·보정·보드 단독 검증이며, 문제가 있으면 담당 feature에서 수정·재검증한다. 실물 확인 후 feature → develop PR로 통합하고 Jetson·웹과 전체 연동을 검증한다.
+네 보드 펌웨어 작성·빌드·PC 테스트는 완료했다. PC 테스트 파일은 2026-10-04 정리했으며, 아래 표의 PC 테스트 수치는 삭제 전 기록이다. 다음 단계는 강의실 설정·배선·보정·보드 단독 검증이며, 문제가 있으면 담당 feature에서 수정·재검증한다. 실물 확인 후 feature → develop PR로 통합하고 Jetson·웹과 전체 연동을 검증한다.
 
 | 대상 | 펌웨어 위치·브랜치 | 보드 없이 확인한 상태 | 강의실에서 확인할 것 |
 |---|---|---|---|
-<<<<<<< HEAD
-| STM32 #1 레이저 | `stm32/laser_head`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 파서 24/24 통과 | USB 명령, Pan/Tilt 보정, 레이저, PIR |
-=======
 | STM32 #1 메인 유닛 | `stm32/main_unit`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 파서 24/24 통과 | USB 명령, Pan/Tilt 보정, 레이저, PIR |
->>>>>>> af2b5f5be335e7e39c1d38259b5af15aeee95252
 | STM32 #2 서랍 | `stm32/drawer`, `feature/stm32` | 2026-10-03 재빌드·경고 0개, PC 모의 테스트 117/117 통과 | USB → HC-06, LED, 서보 밀기·복귀, SOS |
 | ESP32 #1 현관등 | `esp32/entrance_node`, `feature/esp32` | 기본·네트워크 활성화 빌드 성공, PC 테스트 80/80 통과 | 한 색 LED, PIR, Wi-Fi/MQTT, 경고·복귀 |
 | ESP32 #2 부저 | `esp32/buzzer_tag`, `feature/esp32` | 빌드 성공·경고 0개, PC 테스트 70/70 통과 | BLE, 계속 울림, 끄기, 재연결 |
@@ -24,11 +20,7 @@ STM32 항목은 `feature/stm32`의 `3f42ba3`에 저장된 체크리스트를 가
 
 | 연결 | 설정 |
 |---|---|
-<<<<<<< HEAD
-| 레이저 USB VCP (USART2) | 115200, 8N1, 대문자 ASCII, 명령 끝 LF (`\n`) |
-=======
 | 메인 유닛 USB VCP (USART2) | 115200, 8N1, 대문자 ASCII, 명령 끝 LF (`\n`) |
->>>>>>> af2b5f5be335e7e39c1d38259b5af15aeee95252
 | 서랍 USB VCP (USART2, 테스트용) | 115200, 8N1, 같은 시리얼 명령 |
 | 서랍 HC-06 (USART1) | 9600, 8N1 가정. 실제 모듈 속도 확인 |
 | 부저 BLE | Text/UTF-8 한 글자 `1` / `0`, **줄 끝 없음** |
@@ -44,30 +36,22 @@ STM32 항목은 `feature/stm32`의 `3f42ba3`에 저장된 체크리스트를 가
 
 ```powershell
 cmake --build stm32/drawer/build/Debug
-<<<<<<< HEAD
-cmake --build stm32/laser_head/build/Debug
-=======
 cmake --build stm32/main_unit/build/Debug
->>>>>>> af2b5f5be335e7e39c1d38259b5af15aeee95252
-.\stm32\drawer\tests\run_host_tests.cmd
 ```
 
-호스트 테스트 스크립트는 **서랍 테스트와 레이저 파서 테스트를 모두 실행**한다. 설치된 Visual Studio의 MSVC를 사용하며, Developer Command Prompt에서는 현재 `cl`을 사용한다. 그 외에는 현재 PC에서 확인한 VS 18 Insiders 경로를 사용한다. 다른 PC는 개발자 환경에서 실행하거나 스크립트의 VS 경로를 맞춘다. 결과물은 무시되는 `build/host/`에 생성된다.
-
-- 레이저: 파서 24개 검사.
-- 서랍: 파서, 두 UART 독립 수신, CR/LF, 32바이트 경계, 긴 줄 이후 복구, 비정상 문자, 큐 초과, UART 오류 이후 복구, 서보 순차 동작, 타이머 오버플로, 버튼 채터링·길게 누름 검사.
-- 모의 HAL 테스트는 실제 UART 속도, NVIC, PWM 파형, 전원, 서보 이동을 검증하지 않는다.
+- VS Code에서는 각 프로젝트 폴더를 따로 열고 `F7`로 빌드한다. 두 프로젝트 모두 `.settings/bundles-lock.store.json`으로 도구 버전(CMake 4.3.1, GCC 14.3.1, Ninja 1.13.2)을 고정한다.
+- STM32 PC 테스트 폴더는 2026-10-04 정리했다. 1장 표의 PC 테스트 수치는 삭제 전 검증 기록이며, 현재 재검증은 빌드와 강의실 실물 테스트로 진행한다.
+- 2026-10-04 확인: 두 프로젝트 빌드 성공·경고 0개. 메인 유닛 FLASH **19,776바이트**·RAM **2,304바이트**, 서랍 FLASH **21,264바이트**·RAM **2,960바이트**.
+- 빌드 성공은 실제 UART 속도, NVIC, PWM 파형, 전원, 서보 이동 검증을 대신하지 않는다.
 
 ### 부저 (`feature/esp32`)
 
 ```powershell
 & "$env:USERPROFILE/.platformio/penv/Scripts/platformio.exe" run --project-dir esp32/buzzer_tag --environment esp32c3
-& .\esp32\buzzer_tag\tests\run_host_tests.cmd
 ```
 
 - 플랫폼 `espressif32@7.1.3`, Arduino ESP32 2.0.17 계열의 내장 BLE 라이브러리 사용.
-- PC 테스트는 MSVC로 `include/buzzer_control.h`를 실행한다. `cl`이 PATH에 없으면 현재 PC의 VS 18 Insiders 환경을 사용하며, 다른 PC에서는 Visual Studio Developer Command Prompt에서 실행한다.
-- 범위: `1`/`0`, 길이·문자 오류, 반복 명령의 상태 유지, 연결 해제에 쓰는 정지 로직, 재연결 후 명령 처리. 시간에 따른 부저 정지 로직은 없다.
+- ESP32 PC 테스트 폴더는 2026-10-04 정리했다. 아래 PC 테스트 수치는 삭제 전 검증 기록이며, 현재 재검증은 PlatformIO 빌드와 강의실 실물 테스트로 진행한다. 시간에 따른 부저 정지 로직은 없다.
 - 2026-10-03 확인: release 빌드 성공·경고 0개, PC 테스트 **70/70** 통과 (`/W4 /WX`). FLASH **983,938 / 1,310,720바이트 (75.1%, 기본 앱 파티션)**, 정적 RAM **38,636 / 327,680바이트 (11.8%)**. 실행 중 BLE 동적 메모리는 실물에서 확인한다.
 - PC 테스트는 BLE 무선 연결·GPIO·실제 소리 검증을 대신하지 않는다. `.pio/`와 `build/`는 Git에서 제외한다.
 
@@ -75,20 +59,16 @@ cmake --build stm32/main_unit/build/Debug
 
 ```powershell
 & "$env:USERPROFILE/.platformio/penv/Scripts/platformio.exe" run --project-dir esp32/entrance_node --environment lolin_d32 --environment lolin_d32_network_check
-& .\esp32\entrance_node\tests\run_host_tests.cmd
 ```
 
-- `lolin_d32`는 실제 보드용, `lolin_d32_network_check`는 예시 설정으로 네트워크 코드까지 컴파일·링크하는 빌드 검증용이다. 보드 없이 실제 MQTT 서버에 접속하는 테스트가 아니다.
+- `lolin_d32`는 실제 보드용, `lolin_d32_network_check`는 `include/network_config.build_check.h`의 예시 설정으로 네트워크 코드까지 컴파일·링크하는 빌드 검증용이다. 보드 없이 실제 MQTT 서버에 접속하는 테스트가 아니다.
+- ESP32 PC 테스트 폴더는 2026-10-04 정리했다. 아래 PC 테스트 수치는 삭제 전 검증 기록이다.
 - 2026-10-03 확인: 두 빌드 성공·경고 0개, PC 제어 로직 **80/80** 통과 (`/W4 /WX`). PIR 필터·재감지, 점등 유지, ALERT 깜빡임·복귀, 반복 명령, 잘못된 값, 시간 넘침을 검사했다.
 - 빈 설정의 기본 빌드: FLASH **269,753 / 1,310,720바이트 (20.6%)**, 정적 RAM **21,504 / 327,680바이트 (6.6%)**.
 - 네트워크 활성화 빌드: FLASH **878,049 / 1,310,720바이트 (67.0%)**, 정적 RAM **45,320 / 327,680바이트 (13.8%)**. 실행 중 태스크·Wi-Fi·MQTT 동적 메모리는 실물에서 확인한다.
 - 테스트 통과는 PIR 전압·LED 구동·Wi-Fi 연결·실제 MQTT 발행/구독·Last Will 동작 검증을 대신하지 않는다.
 
-<<<<<<< HEAD
-## 3. STM32 #1 레이저 헤드
-=======
 ## 3. STM32 #1 메인 유닛 (레이저·Pan/Tilt·PIR)
->>>>>>> af2b5f5be335e7e39c1d38259b5af15aeee95252
 
 연결: **USB VCP 115200, 8N1**, 명령 끝 LF. 카메라는 고정하고 레이저만 Pan/Tilt로 움직이는 구성이다. 목표 좌표를 각도로 바꾸는 것은 Jetson, 받은 각도를 서보 펄스로 바꾸는 것은 STM32가 담당한다.
 
