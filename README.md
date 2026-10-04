@@ -513,7 +513,7 @@ Retrace-Project/
 └─ README.md
 ```
 
-> 위 구조는 각 담당 feature의 코드 기준입니다. 아직 기능을 develop에 통합하지 않았으므로 한 feature 체크아웃에 다른 feature의 완성 코드가 모두 있는 것은 아닙니다. Jetson 항목은 담당 모듈 구조이며 서버 구현 완료를 뜻하지 않습니다. 웹 뼈대는 `feature/web`에 있고 실제 서버·장치 연동은 대기 중입니다.
+> 위 구조는 각 담당 feature 브랜치의 코드 기준입니다. 기능별 코드는 담당 feature 브랜치(STM32 = `feature/stm32`, ESP32 = `feature/esp32`, Jetson = `feature/jetson`, 웹 = `feature/web`)에 있고, develop에 합친 뒤 한 브랜치에서 모두 볼 수 있습니다.
 
 ---
 
@@ -524,38 +524,3 @@ Retrace-Project/
 - [협업 규칙](CONTRIBUTING.md) — feature 단독 검증 후 develop 통합
 - [강의실 통합 테스트](docs/classroom_test_checklist.md) — 레이저 · 서랍 · 현관등 · 부저 · Jetson/웹 연동
 - [웹 뼈대 실행·인계](web/README.md) — `feature/web`에서 샘플 화면 확인, API JSON 임시안과 실제 연결 전환
-
----
-
-## 진행 상태
-
-**2026-10-03 기준: 네 보드의 펌웨어 작성·빌드·PC 테스트 완료. 강의실 실물 검증과 Jetson·웹 통합은 대기 중입니다.**
-
-| 보드 | 완료한 기능 | 빌드·PC 검증 | 남은 확인 |
-|---|---|---|---|
-| 메인 유닛 STM32 #1 | USB 명령·응답, AIM, LASER, HOME, PIR 이벤트 | 빌드 성공·경고 0개, 파서 24/24 통과 | 업로드, 서보 범위 보정, 레이저·PIR |
-| 서랍 STM32 #2 | USB·HC-06 명령, LED, 서보 순차 밀기·복귀, 소등 타이머, SOS | 빌드 성공·경고 0개, 모의 테스트 117/117 통과 | USB → HC-06, 펄스·시간 보정, 배선·실제 구동 |
-| 현관등 ESP32 #1 | PIR 센서등, Wi-Fi·MQTT, NORMAL/ALERT, 연결 상태 | 기본·네트워크 활성화 빌드 성공·경고 0개, PC 테스트 80/80 통과 | 네트워크 설정, PIR·LED, 실제 MQTT |
-| 부저 ESP32 #2 | BLE 1/0, 계속 울림, 연결 해제 시 정지·재광고 | 빌드 성공·경고 0개, PC 테스트 70/70 통과 | 부저 종류·구동, BLE 연결·소리·재연결 |
-
-빌드·PC 테스트는 실제 UART·PWM·무선 통신·배선·기구 동작 확인을 대신하지 않습니다. 실물에서 문제가 발견되면 담당 feature에서 수정하고 재검증합니다.
-
-PC 테스트 파일은 2026-10-04 정리했습니다. 표의 PC 테스트 수치는 삭제 전 기록이며, 이후 재검증은 빌드와 강의실 실물 테스트로 진행합니다.
-
-웹은 `feature/web`에서 차키·에어팟·안경 검색, Last Seen 상세, 레이저 안내 요청, 2열×3행 서랍 선택, 부저 찾기·끄기 화면을 작성했습니다. 기본값은 샘플 모드입니다. 외부 패키지 설치 없이 `node web/dev-server.mjs`로 실행하며, API 경로는 기존 프로토콜을 유지합니다. JSON 형식은 [프로토콜 7-1](docs/protocol.md)에 명시한 임시안으로 Jetson 담당자와 합의가 필요합니다. Jetson 서버·실물 연결은 아직 확인하지 않았습니다.
-
-웹 API 테스트 30/30 통과, PC·휴대폰 360·390px 화면과 키보드 선택을 확인했습니다. 실제 모드의 서버 부재 오류도 확인했으며, 자세한 범위와 미확인 항목은 [웹 인계 문서](web/README.md)에 정리했습니다.
-
-### 강의실에서 할 일
-
-1. 해당 보드의 완성 코드가 있는 feature로 이동해 업로드 준비: STM32는 `feature/stm32`, ESP32는 `feature/esp32`.
-2. 배선·전원·부품을 확인하고 [통합 체크리스트](docs/classroom_test_checklist.md)로 보드별 단독 테스트.
-3. 레이저 펄스 범위, 서랍 밀기·복귀 펄스와 시간을 실물에 맞춰 보정. 서랍 LED는 현재 10초 타이머이며 닫힘 감지 기능은 없음.
-4. 현관등은 `network_config.example.h`를 `network_config.h`로 복사해 Wi-Fi 정보와 Jetson LAN IP를 입력한 뒤 `lolin_d32`로 재빌드·업로드. 현재 실제 설정 파일은 미작성이며 빈 설정이면 기본 PIR 센서등만 동작.
-5. 부저는 액티브 부저 기준으로 BLE `1`/ `0` 테스트. 시간 제한 없이 울리고, `0` 또는 연결 해제 감지 시 정지.
-
-### 통합 순서
-
-**각 feature에서 실물 확인·보정 → feature에서 수정·commit·push → PR로 develop 통합 → Jetson·웹·전체 보드 연동 테스트 → 확인된 버전을 main으로 PR.**
-
-보드 단독 확인에는 PC 시리얼·BLE 테스트 앱·MQTT 테스트 명령을 사용합니다. 웹의 찾기/끄기 요청 전달, 카메라 목표 위치의 각도 계산, SOS 알림 연결은 Jetson·웹 담당자의 구현과 함께 확인합니다. 사용자 담당 펌웨어 코드는 각 feature에 commit·push됐고 같은 원격 feature에서 pull도 확인했습니다. 기능을 develop에 통합하는 작업은 아직 진행하지 않았습니다.
