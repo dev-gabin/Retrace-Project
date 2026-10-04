@@ -3,9 +3,9 @@
 
 #include <stddef.h>
 
-/* HAL을 쓰지 않는 순수 C 코드 → PC에서도 테스트 가능 (tests/test_cmd_parser.c) */
+/* HAL을 쓰지 않는 순수 C 코드: 명령 문자열 해석과 응답 문자열 생성만 담당 */
 
-/* 레이저 헤드가 받는 명령 (protocol.md 1장, 2장) */
+/* 메인 유닛이 받는 명령 (protocol.md 1장, 2장) */
 typedef enum {
   CMD_PING,
   CMD_AIM,
