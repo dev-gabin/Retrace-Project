@@ -9,7 +9,8 @@ Retrace 팀이 같은 저장소에서 작업할 때 지키는 규칙입니다.
 | 담당 | 폴더 | 작업 브랜치 |
 |---|---|---|
 | STM32 ×2 · ESP32 ×2 펌웨어 | `stm32/`, `esp32/` | `feature/stm32`, `feature/esp32` |
-| Jetson Nano · Web | `jetson_nano/`, `web/` | `feature/jetson` |
+| Jetson Nano 서버·인식·DB | `jetson_nano/` | `feature/jetson` |
+| 웹 화면·HTTP API 연결 틀 | `web/` | `feature/web` |
 | 공통 문서 | `docs/`, `README.md` | 관련 작업 브랜치에 같이 포함 |
 
 ---
@@ -23,11 +24,13 @@ Retrace 팀이 같은 저장소에서 작업할 때 지키는 규칙입니다.
 | `feature/stm32` | STM32 작업 |
 | `feature/esp32` | ESP32 작업 |
 | `feature/jetson` | Jetson 작업 |
+| `feature/web` | 웹 화면 작업, 프로토콜 JSON 합의 후 Jetson 연결 |
 
 ```text
 feature/stm32  ─┐
 feature/esp32  ─┼──▶ develop ──(통합 테스트 · PR · 승인)──▶ main
-feature/jetson ─┘
+feature/jetson ─┤
+feature/web    ─┘
 ```
 
 ---
@@ -62,13 +65,15 @@ git commit -m "Add drawer LED timer"
 git push origin feature/본인파트
 ```
 
-완료 코드는 자기 feature에 보존합니다. 강의실에서 해당 feature로 보드를 업로드해 단독 테스트·보정하고, 문제가 있으면 같은 feature에서 수정·재검증·push합니다. 빌드·PC 테스트 성공과 실물 성공을 구분합니다.
+완료 코드는 자기 feature에 보존합니다. 강의실에서 해당 feature로 보드를 업로드해 단독 테스트·보정하고, 문제가 있으면 같은 feature에서 수정·재검증·push합니다. 빌드 성공과 실물 성공을 구분합니다.
 
 **5. 확인된 기능을 develop으로 PR**
 
 GitHub에서 `feature/*` → `develop` PR 생성 → 변경 확인 → merge합니다. develop에서 Jetson·웹·여러 보드의 전체 연동을 확인합니다. 담당 feature는 통합 후에도 후속 수정에 사용할 수 있습니다.
 
 2026-10-03 기준 네 보드 펌웨어는 빌드·PC 테스트까지 완료했으며, 강의실 실물 검증과 기능의 develop 통합은 아직 진행하지 않았습니다. 테스트 결과와 보정값은 [통합 체크리스트](docs/classroom_test_checklist.md)에 기록합니다.
+
+웹 뼈대는 `feature/web`에 별도로 보존합니다. [웹 인계 문서](web/README.md)의 실행 방법을 사용하며, 기본 샘플 모드에서는 기기로 명령을 보내지 않습니다. 기존 HTTP 메서드·경로는 [프로토콜 7장](docs/protocol.md)을 따르고 JSON은 7-1의 임시안을 Jetson 담당자와 함께 확정합니다. 화면 테스트와 실제 Jetson·장치 연동 성공을 구분합니다.
 
 ---
 
