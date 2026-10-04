@@ -435,13 +435,12 @@ Retrace-Project/
 │  │  ├─ platformio.ini              # 보드 · 라이브러리 설정
 │  │  ├─ include/entrance_control.h   # PIR 필터 · 센서등 · 경고 타이머
 │  │  ├─ include/network_config.example.h # Wi-Fi · Jetson 주소 설정 예제
-│  │  ├─ src/main.cpp                # PIR GPIO34 · LED GPIO25 · Wi-Fi · MQTT
-│  │  └─ tests/                      # PC 제어 로직 · 네트워크 빌드 검증
+│  │  ├─ include/network_config.build_check.h # 네트워크 컴파일·링크 검증용 예시값
+│  │  └─ src/main.cpp                # PIR GPIO34 · LED GPIO25 · Wi-Fi · MQTT
 │  └─ buzzer_tag/                    # 부저 태그 (ESP32-C3)
 │     ├─ platformio.ini
-│     ├─ include/buzzer_control.h    # ON/OFF 명령 (PC 테스트 가능)
-│     ├─ src/main.cpp                # BLE 수신 · GPIO3 부저
-│     └─ tests/                      # MSVC로 실행하는 PC 로직 테스트
+│     ├─ include/buzzer_control.h    # ON/OFF 명령 처리
+│     └─ src/main.cpp                # BLE 수신 · GPIO3 부저
 │
 ├─ jetson_nano/                      # 허브 (C/C++)
 │  ├─ main.cpp
@@ -469,12 +468,11 @@ Retrace-Project/
 │  │  │  └─ Src/
 │  │  │     ├─ main.c                # CubeMX 생성 (초기화 · 메인 루프)
 │  │  │     ├─ serial_cmd.c          # UART 인터럽트 수신 · 응답
-│  │  │     ├─ cmd_parser.c          # HAL 독립 명령 해석 (PC 테스트 가능)
+│  │  │     ├─ cmd_parser.c          # HAL 독립 명령 해석
 │  │  │     ├─ pir_sensor.c          # PIR 입력 처리
 │  │  │     ├─ pan_tilt.c            # Pan/Tilt 서보 PWM
 │  │  │     ├─ laser.c               # 레이저 ON/OFF
 │  │  │     └─ ...                   # 그 외 CubeMX 생성 파일
-│  │  ├─ tests/                      # PC 파서 테스트
 │  │  ├─ Drivers/                    # HAL · CMSIS (CubeMX 생성)
 │  │  ├─ cmake/
 │  │  ├─ CMakeLists.txt
@@ -493,7 +491,6 @@ Retrace-Project/
 │     │     ├─ serial_cmd.c          # HC-06 · USB 수신 큐 및 응답
 │     │     ├─ cmd_parser.c          # HAL 독립 서랍 명령 해석
 │     │     └─ ...                   # 그 외 CubeMX 생성 파일
-│     ├─ tests/                      # 두 STM32 보드 PC 테스트 실행
 │     └─ ...                         # CubeMX 생성 (Drivers, cmake, .ioc 등)
 │
 ├─ web/                              # feature/web: 정적 웹 뼈대 (기본 샘플 모드)
@@ -542,6 +539,8 @@ Retrace-Project/
 | 부저 ESP32 #2 | BLE 1/0, 계속 울림, 연결 해제 시 정지·재광고 | 빌드 성공·경고 0개, PC 테스트 70/70 통과 | 부저 종류·구동, BLE 연결·소리·재연결 |
 
 빌드·PC 테스트는 실제 UART·PWM·무선 통신·배선·기구 동작 확인을 대신하지 않습니다. 실물에서 문제가 발견되면 담당 feature에서 수정하고 재검증합니다.
+
+PC 테스트 파일은 2026-10-04 정리했습니다. 표의 PC 테스트 수치는 삭제 전 기록이며, 이후 재검증은 빌드와 강의실 실물 테스트로 진행합니다.
 
 웹은 `feature/web`에서 차키·에어팟·안경 검색, Last Seen 상세, 레이저 안내 요청, 2열×3행 서랍 선택, 부저 찾기·끄기 화면을 작성했습니다. 기본값은 샘플 모드입니다. 외부 패키지 설치 없이 `node web/dev-server.mjs`로 실행하며, API 경로는 기존 프로토콜을 유지합니다. JSON 형식은 [프로토콜 7-1](docs/protocol.md)에 명시한 임시안으로 Jetson 담당자와 합의가 필요합니다. Jetson 서버·실물 연결은 아직 확인하지 않았습니다.
 
