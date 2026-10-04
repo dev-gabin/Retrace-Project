@@ -71,9 +71,9 @@ git push origin feature/본인파트
 
 GitHub에서 `feature/*` → `develop` PR 생성 → 변경 확인 → merge합니다. develop에서 Jetson·웹·여러 보드의 전체 연동을 확인합니다. 담당 feature는 통합 후에도 후속 수정에 사용할 수 있습니다.
 
-2026-10-03 기준 네 보드 펌웨어는 빌드·PC 테스트까지 완료했으며, 강의실 실물 검증과 기능의 develop 통합은 아직 진행하지 않았습니다. 테스트 결과와 보정값은 [통합 체크리스트](docs/classroom_test_checklist.md)에 기록합니다.
+테스트 결과와 보정값은 [통합 체크리스트](docs/classroom_test_checklist.md)에 기록합니다.
 
-웹 뼈대는 `feature/web`에 별도로 보존합니다. [웹 인계 문서](web/README.md)의 실행 방법을 사용하며, 기본 샘플 모드에서는 기기로 명령을 보내지 않습니다. 기존 HTTP 메서드·경로는 [프로토콜 7장](docs/protocol.md)을 따르고 JSON은 7-1의 임시안을 Jetson 담당자와 함께 확정합니다. 화면 테스트와 실제 Jetson·장치 연동 성공을 구분합니다.
+웹은 `feature/web`에서 작업하며, 실행 방법은 [웹 인계 문서](web/README.md)를 따릅니다.
 
 ---
 
@@ -88,7 +88,6 @@ GitHub에서 `feature/*` → `develop` PR 생성 → 변경 확인 → merge합�
 
 - **영어, 동사로 시작**, 한 줄로 짧게
 - 항상 `-m`을 붙여서 커밋 (`-m` 없이 `git commit`만 하면 편집기가 열림)
-- 작성자 정보는 사용자 Git 계정만 사용하며 AI 공동 작성자 표시를 추가하지 않음
 
 | 동사 | 쓰는 경우 | 예 |
 |---|---|---|
@@ -115,5 +114,5 @@ GitHub에서 `feature/*` → `develop` PR 생성 → 변경 확인 → merge합�
 |---|---|---|
 | [docs/protocol.md](docs/protocol.md) | 보드 간 메시지 형식 | 코드와 다르면 **문서 기준**. 바꿀 땐 **문서 먼저 수정**하고 공유 |
 | [docs/pinmap.md](docs/pinmap.md) | 보드별 핀 배정 · 설정 | 핀을 바꾸면 같은 커밋에 문서도 수정 |
-| [README.md](README.md) | 프로젝트 소개 · 구조 · 완료 상태 | 구조·검증 상태가 바뀌면 같이 수정 |
-| [docs/classroom_test_checklist.md](docs/classroom_test_checklist.md) | 네 보드 단독·전체 연동 테스트 | 실제 실행한 항목만 체크하고 실측값 기록 |
+| [README.md](README.md) | 프로젝트 소개 · 구조 | 폴더 구조가 바뀌면 같이 수정 |
+| [docs/classroom_test_checklist.md](docs/classroom_test_checklist.md) | 보드 단독·전체 연동 테스트 | 실제 실행한 항목만 체크하고 실측값 기록 |
