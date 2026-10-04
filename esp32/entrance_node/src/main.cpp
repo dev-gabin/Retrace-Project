@@ -5,7 +5,7 @@
 #include "entrance_control.h"
 
 #if defined(RETRACE_NETWORK_BUILD_CHECK)
-#include "../tests/network_config.build_check.h"
+#include "network_config.build_check.h"
 #elif __has_include("network_config.h")
 #include "network_config.h"
 #else

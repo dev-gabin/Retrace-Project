@@ -435,13 +435,12 @@ Retrace-Project/
 │  │  ├─ platformio.ini              # 보드 · 라이브러리 설정
 │  │  ├─ include/entrance_control.h   # PIR 필터 · 센서등 · 경고 타이머
 │  │  ├─ include/network_config.example.h # Wi-Fi · Jetson 주소 설정 예제
-│  │  ├─ src/main.cpp                # PIR GPIO34 · LED GPIO25 · Wi-Fi · MQTT
-│  │  └─ tests/                      # PC 제어 로직 · 네트워크 빌드 검증
+│  │  ├─ include/network_config.build_check.h # 네트워크 컴파일·링크 검증용 예시값
+│  │  └─ src/main.cpp                # PIR GPIO34 · LED GPIO25 · Wi-Fi · MQTT
 │  └─ buzzer_tag/                    # 부저 태그 (ESP32-C3)
 │     ├─ platformio.ini
-│     ├─ include/buzzer_control.h    # ON/OFF 명령 (PC 테스트 가능)
-│     ├─ src/main.cpp                # BLE 수신 · GPIO3 부저
-│     └─ tests/                      # MSVC로 실행하는 PC 로직 테스트
+│     ├─ include/buzzer_control.h    # ON/OFF 명령 처리
+│     └─ src/main.cpp                # BLE 수신 · GPIO3 부저
 │
 ├─ jetson_nano/                      # 허브 (C/C++)
 │  ├─ main.cpp

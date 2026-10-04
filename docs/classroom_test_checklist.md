@@ -50,12 +50,10 @@ cmake --build stm32/main_unit/build/Debug
 
 ```powershell
 & "$env:USERPROFILE/.platformio/penv/Scripts/platformio.exe" run --project-dir esp32/buzzer_tag --environment esp32c3
-& .\esp32\buzzer_tag\tests\run_host_tests.cmd
 ```
 
 - 플랫폼 `espressif32@7.1.3`, Arduino ESP32 2.0.17 계열의 내장 BLE 라이브러리 사용.
-- PC 테스트는 MSVC로 `include/buzzer_control.h`를 실행한다. `cl`이 PATH에 없으면 현재 PC의 VS 18 Insiders 환경을 사용하며, 다른 PC에서는 Visual Studio Developer Command Prompt에서 실행한다.
-- 범위: `1`/`0`, 길이·문자 오류, 반복 명령의 상태 유지, 연결 해제에 쓰는 정지 로직, 재연결 후 명령 처리. 시간에 따른 부저 정지 로직은 없다.
+- ESP32 PC 테스트 폴더는 2026-10-04 정리했다. 아래 PC 테스트 수치는 삭제 전 검증 기록이며, 현재 재검증은 PlatformIO 빌드와 강의실 실물 테스트로 진행한다. 시간에 따른 부저 정지 로직은 없다.
 - 2026-10-03 확인: release 빌드 성공·경고 0개, PC 테스트 **70/70** 통과 (`/W4 /WX`). FLASH **983,938 / 1,310,720바이트 (75.1%, 기본 앱 파티션)**, 정적 RAM **38,636 / 327,680바이트 (11.8%)**. 실행 중 BLE 동적 메모리는 실물에서 확인한다.
 - PC 테스트는 BLE 무선 연결·GPIO·실제 소리 검증을 대신하지 않는다. `.pio/`와 `build/`는 Git에서 제외한다.
 
@@ -63,10 +61,10 @@ cmake --build stm32/main_unit/build/Debug
 
 ```powershell
 & "$env:USERPROFILE/.platformio/penv/Scripts/platformio.exe" run --project-dir esp32/entrance_node --environment lolin_d32 --environment lolin_d32_network_check
-& .\esp32\entrance_node\tests\run_host_tests.cmd
 ```
 
-- `lolin_d32`는 실제 보드용, `lolin_d32_network_check`는 예시 설정으로 네트워크 코드까지 컴파일·링크하는 빌드 검증용이다. 보드 없이 실제 MQTT 서버에 접속하는 테스트가 아니다.
+- `lolin_d32`는 실제 보드용, `lolin_d32_network_check`는 `include/network_config.build_check.h`의 예시 설정으로 네트워크 코드까지 컴파일·링크하는 빌드 검증용이다. 보드 없이 실제 MQTT 서버에 접속하는 테스트가 아니다.
+- ESP32 PC 테스트 폴더는 2026-10-04 정리했다. 아래 PC 테스트 수치는 삭제 전 검증 기록이다.
 - 2026-10-03 확인: 두 빌드 성공·경고 0개, PC 제어 로직 **80/80** 통과 (`/W4 /WX`). PIR 필터·재감지, 점등 유지, ALERT 깜빡임·복귀, 반복 명령, 잘못된 값, 시간 넘침을 검사했다.
 - 빈 설정의 기본 빌드: FLASH **269,753 / 1,310,720바이트 (20.6%)**, 정적 RAM **21,504 / 327,680바이트 (6.6%)**.
 - 네트워크 활성화 빌드: FLASH **878,049 / 1,310,720바이트 (67.0%)**, 정적 RAM **45,320 / 327,680바이트 (13.8%)**. 실행 중 태스크·Wi-Fi·MQTT 동적 메모리는 실물에서 확인한다.
