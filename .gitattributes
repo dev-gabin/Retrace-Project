@@ -1,1 +1,5 @@
 * text=auto
+
+# STM32 VS Code 확장이 LF로 다시 저장하는 파일 → 모든 PC에서 LF로 고정
+stm32/*/.settings/*.json text eol=lf
+stm32/*/.clangd text eol=lf
