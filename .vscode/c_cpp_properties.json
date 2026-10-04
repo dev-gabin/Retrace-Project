@@ -1,7 +1,7 @@
 {
   "configurations": [
     {
-      "name": "Retrace",
+      "name": "Win32",
       "compileCommands": [
         "${workspaceFolder}/stm32/main_unit/build/Debug/compile_commands.json",
         "${workspaceFolder}/stm32/drawer/build/Debug/compile_commands.json",
@@ -27,6 +27,18 @@
         "DEBUG",
         "STM32F411xE",
         "USE_HAL_DRIVER"
+      ]
+    },
+    {
+      "name": "Linux",
+      "compileCommands": [
+        "${workspaceFolder}/jetson_nano/build/compile_commands.json",
+        "${workspaceFolder}/build/compile_commands.json"
+      ],
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "includePath": [
+        "${workspaceFolder}/jetson_nano/**"
       ]
     }
   ],
