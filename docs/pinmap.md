@@ -10,6 +10,8 @@
 | **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25 구현·빌드·PC 80/80 완료 / 실물 확인 전 |
 | **ESP32 #2** (ESP32-C3 Super Mini) | 부저 태그 (부저) | `esp32/buzzer_tag` | BLE | GPIO3 구현·빌드·PC 70/70 완료 / 실물 확인 전 |
 
+> PC 테스트 수치(24/24 · 117/117 · 80/80 · 70/70)는 2026-10-04 테스트 파일 정리 전 기록입니다.
+
 ---
 
 ## 1. STM32 공통
@@ -83,7 +85,7 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 | 항목 | 내용 |
 |---|---|
 | 에디터 | VS Code + **STM32CubeIDE for Visual Studio Code** 확장 팩 |
-| 도구(번들) | 각 프로젝트 `.settings/bundles-lock.store.json`에 고정된 버전 사용 (CMake, Ninja, gnu-tools-for-stm32 14.3.1) |
+| 도구(번들) | 각 프로젝트 `.settings/bundles-lock.store.json`에 고정된 버전 사용 (CMake 4.3.1, Ninja 1.13.2, gnu-tools-for-stm32 14.3.1 — 두 프로젝트 동일) |
 | 열 폴더 | `stm32/main_unit` 또는 `stm32/drawer` (각각 따로 열기) |
 | 빌드 | `F7` (CMake: Build), 프리셋 `Debug` |
 | 성공 기준 | 출력 탭 `CMake/빌드` → `빌드가 완료됨(종료 코드: 0)` |

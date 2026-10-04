@@ -62,7 +62,7 @@ git commit -m "Add drawer LED timer"
 git push origin feature/본인파트
 ```
 
-완료 코드는 자기 feature에 보존합니다. 강의실에서 해당 feature로 보드를 업로드해 단독 테스트·보정하고, 문제가 있으면 같은 feature에서 수정·재검증·push합니다. 빌드·PC 테스트 성공과 실물 성공을 구분합니다.
+완료 코드는 자기 feature에 보존합니다. 강의실에서 해당 feature로 보드를 업로드해 단독 테스트·보정하고, 문제가 있으면 같은 feature에서 수정·재검증·push합니다. 빌드 성공과 실물 성공을 구분합니다.
 
 **5. 확인된 기능을 develop으로 PR**
 
