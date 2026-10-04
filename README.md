@@ -229,103 +229,6 @@ Wi-Fi 노드는 Jetson의 MQTT 브로커(Mosquitto)를 통해 이벤트와 명�
 
 ---
 
-## 하드웨어 역할
-
-### 메인 유닛 – Jetson Nano
-
-시스템의 허브(중앙 처리 장치)입니다.
-
-담당 기능:
-
-- 카메라 영상 입력
-- YOLO 객체 탐지 / OpenCV 영상 처리
-- Last Seen 판단 및 기록
-- DB / 이미지 저장
-- Web/PWA 서버
-- MQTT 브로커
-- ntfy 알림 서버 (폰 사이렌, 외출 알림)
-- STM32 통신 (USB Serial)
-- 서랍 노드 통신 (Bluetooth)
-- 부저 태그 통신 (BLE)
-
----
-
-### 메인 유닛 – STM32 #1 (NUCLEO-F411RE)
-
-메인 유닛의 **장치 제어·센서 입력을 담당하는 STM32 보드**입니다. Pan/Tilt와 레이저를 제어하고 PIR 이벤트를 Jetson에 전달합니다. 카메라는 고정하고 레이저만 Pan/Tilt로 움직입니다.
-
-담당 기능:
-
-- Pan / Tilt 서보 제어
-- 레이저 ON/OFF
-- PIR 센서 입력
-- Jetson과 통신 (USB Serial)
-
-```text
-STM32
-├─ Pan Servo
-├─ Tilt Servo
-├─ Laser
-└─ PIR
-```
-
-핀 배정은 [핀맵](docs/pinmap.md)을 참고합니다.
-
----
-
-### 서랍 노드 – STM32 #2 (NUCLEO-F411RE)
-
-**스마트 서랍**을 담당합니다.
-
-담당 기능:
-
-- 서랍 LED ×6 제어
-- 서랍 팝업 서보 ×6 제어
-- 비상 버튼 입력
-- Jetson과 통신 (HC-06 Bluetooth)
-
-```text
-STM32 #2
-├─ Drawer LED ×6
-├─ Drawer Popup Servo ×6
-├─ Emergency Button
-└─ HC-06 (Bluetooth)
-```
-
-> STM32는 3.3V 로직이라 HC-06과 전압 분배 저항 없이 바로 연결합니다.  
-> 서보 6개는 외부 5V 전원을 사용하고, GND는 STM32와 공통으로 연결합니다.
-
----
-
-### 출입 노드 – LOLIN D32 (ESP32)
-
-**스마트 현관등**입니다.
-
-담당 기능:
-
-- PIR로 외출 감지
-- 현관등 점등 (평소) / 경고 점등 (물건 두고 나갈 때)
-- Jetson과 통신 (Wi-Fi, MQTT)
-
-```text
-LOLIN D32
-├─ PIR
-└─ LED (현관등)
-```
-
----
-
-### 부저 태그 – ESP32-C3
-
-중요 물건에 부착하는 **BLE 부저 태그**입니다.
-
-담당 기능:
-
-- Jetson의 BLE 신호 수신
-- 부저 울림
-
----
-
 ## 데이터 흐름
 
 ### 물건 감지
@@ -429,16 +332,61 @@ Jetson Nano
 
 ```text
 Retrace-Project/
-├─ stm32/               # STM32 프로젝트 (CubeMX + CMake)
-│  ├─ main_unit/        # STM32 #1 메인 유닛 — Pan/Tilt 서보 · 레이저 · PIR (USB Serial)
-│  └─ drawer/           # STM32 #2 서랍 — LED ×6 · 팝업 서보 ×6 · 비상 버튼 (HC-06)
-├─ esp32/               # ESP32 프로젝트 (PlatformIO · Arduino)
-│  ├─ entrance_node/    # ESP32 #1 현관등 — PIR · LED (Wi-Fi · MQTT)
-│  └─ buzzer_tag/       # ESP32 #2 부저 태그 — 부저 (BLE)
-├─ jetson_nano/         # 허브 — 객체 탐지 · Last Seen · DB · 서버 · 보드 통신
-├─ web/                 # 사용자 화면 (Web / PWA)
-├─ docs/                # 핀맵 · 통신 프로토콜 · 강의실 테스트 체크리스트
-├─ CONTRIBUTING.md      # 협업 규칙
+├─ stm32/                              # STM32 프로젝트 (CubeMX + CMake)
+│  ├─ main_unit/                       # STM32 #1 메인 유닛 (Jetson ↔ USB Serial)
+│  │  ├─ Retrace_STM32.ioc             # CubeMX 핀·주변장치 설정
+│  │  └─ Core/Src/
+│  │     ├─ main.c                     # 초기화 · 메인 루프
+│  │     ├─ serial_cmd.c               # UART 인터럽트 수신 · 응답
+│  │     ├─ cmd_parser.c               # 명령 해석 (PING · AIM · LASER · HOME)
+│  │     ├─ pan_tilt.c                 # Pan/Tilt 서보 PWM
+│  │     ├─ laser.c                    # 레이저 ON/OFF
+│  │     └─ pir_sensor.c               # PIR 감지 → EVT:PIR
+│  └─ drawer/                          # STM32 #2 서랍 (Jetson ↔ HC-06)
+│     ├─ drawer.ioc                    # CubeMX 핀·주변장치 설정
+│     └─ Core/Src/
+│        ├─ main.c                     # 초기화 · 메인 루프
+│        ├─ serial_cmd.c               # HC-06 · USB 수신 · 응답
+│        ├─ cmd_parser.c               # 명령 해석 (PING · DRAWER · LED)
+│        ├─ drawer.c                   # 서랍 LED ×6 · 팝업 서보 ×6 · 소등 타이머
+│        └─ emergency_button.c         # 비상 버튼 → EVT:BTN:SOS
+│
+├─ esp32/                              # ESP32 프로젝트 (PlatformIO · Arduino)
+│  ├─ entrance_node/                   # ESP32 #1 현관등 (Jetson ↔ Wi-Fi · MQTT)
+│  │  ├─ platformio.ini                # 보드 · 빌드 설정
+│  │  ├─ src/main.cpp                  # PIR · LED · Wi-Fi · MQTT
+│  │  └─ include/
+│  │     ├─ entrance_control.h         # PIR 필터 · 센서등 · 경고 타이머
+│  │     └─ network_config.example.h   # Wi-Fi · Jetson 주소 설정 예제
+│  └─ buzzer_tag/                      # ESP32 #2 부저 태그 (Jetson ↔ BLE)
+│     ├─ platformio.ini                # 보드 · 빌드 설정
+│     ├─ src/main.cpp                  # BLE 수신 · 부저
+│     └─ include/buzzer_control.h      # ON/OFF 명령 처리
+│
+├─ jetson_nano/                        # 허브 (C/C++)
+│  ├─ main.cpp
+│  ├─ vision/                          # 객체 탐지 · 영상 처리
+│  ├─ record/                          # Last Seen 생성 · 관리
+│  ├─ storage/                         # DB · 스냅샷 저장
+│  ├─ communication/                   # Stm32Link · DrawerLink · MqttLink · BleBuzzer · PhoneNotifier
+│  └─ server/                          # Web/PWA 요청 처리
+│
+├─ web/                                # 사용자 화면 (Web / PWA)
+│  ├─ index.html                       # 물건 찾기 · 서랍 · 부저 화면
+│  ├─ styles.css                       # PC · 휴대폰 레이아웃
+│  ├─ app.js                           # 검색 · 선택 · 요청 · 오류 표시
+│  ├─ api.js                           # HTTP API 요청 · 응답 검사
+│  ├─ config.js                        # 샘플/실제 모드 · 서버 주소
+│  ├─ demo-data.js                     # 샘플 기록
+│  ├─ assets/                          # 화면 이미지 (샘플 장면)
+│  ├─ dev-server.mjs                   # 로컬 미리보기 서버
+│  └─ README.md                        # 실행 · Jetson 연결 방법
+│
+├─ docs/
+│  ├─ protocol.md                      # 보드 간 통신 프로토콜
+│  ├─ pinmap.md                        # 보드별 핀 배정
+│  └─ classroom_test_checklist.md      # 강의실 테스트 체크리스트
+├─ CONTRIBUTING.md                     # 협업 규칙
 └─ README.md
 ```
 
