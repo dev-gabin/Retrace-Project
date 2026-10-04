@@ -399,5 +399,3 @@ Retrace-Project/
 - [핀맵](docs/pinmap.md) — STM32 ×2, ESP32 ×2
 - [통신 프로토콜](docs/protocol.md)
 - [협업 규칙](CONTRIBUTING.md) — feature 단독 검증 후 develop 통합
-- [강의실 통합 테스트](docs/classroom_test_checklist.md) — 레이저 · 서랍 · 현관등 · 부저 · Jetson/웹 연동
-- [웹 뼈대 실행·인계](web/README.md) — `feature/web`에서 샘플 화면 확인, API JSON 임시안과 실제 연결 전환
