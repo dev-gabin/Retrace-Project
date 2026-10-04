@@ -1,0 +1,34 @@
+{
+  "configurations": [
+    {
+      "name": "Retrace",
+      "compileCommands": [
+        "${workspaceFolder}/stm32/main_unit/build/Debug/compile_commands.json",
+        "${workspaceFolder}/stm32/drawer/build/Debug/compile_commands.json",
+        "${workspaceFolder}/esp32/entrance_node/compile_commands.json",
+        "${workspaceFolder}/esp32/buzzer_tag/compile_commands.json"
+      ],
+      "compilerPath": "${env:LOCALAPPDATA}/stm32cube/bundles/gnu-tools-for-stm32/14.3.1+st.2/bin/arm-none-eabi-gcc.exe",
+      "compilerArgs": [
+        "-mcpu=cortex-m4",
+        "-mfpu=fpv4-sp-d16",
+        "-mfloat-abi=hard"
+      ],
+      "cStandard": "gnu11",
+      "cppStandard": "gnu++17",
+      "includePath": [
+        "${workspaceFolder}/stm32/main_unit/Core/Inc",
+        "${workspaceFolder}/stm32/main_unit/Drivers/STM32F4xx_HAL_Driver/Inc",
+        "${workspaceFolder}/stm32/main_unit/Drivers/STM32F4xx_HAL_Driver/Inc/Legacy",
+        "${workspaceFolder}/stm32/main_unit/Drivers/CMSIS/Device/ST/STM32F4xx/Include",
+        "${workspaceFolder}/stm32/main_unit/Drivers/CMSIS/Include"
+      ],
+      "defines": [
+        "DEBUG",
+        "STM32F411xE",
+        "USE_HAL_DRIVER"
+      ]
+    }
+  ],
+  "version": 4
+}
