@@ -1,15 +1,26 @@
 {
   "configurations": [
     {
-      "name": "ESP32",
+      "name": "Retrace",
       "compileCommands": [
+        "${workspaceFolder}/stm32/main_unit/build/Debug/compile_commands.json",
+        "${workspaceFolder}/stm32/drawer/build/Debug/compile_commands.json",
         "${workspaceFolder}/esp32/entrance_node/compile_commands.json",
         "${workspaceFolder}/esp32/buzzer_tag/compile_commands.json"
       ],
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "includePath": [
+        "${workspaceFolder}/jetson_nano/**"
+      ],
       "browse": {
         "path": [
+          "${workspaceFolder}/stm32/main_unit",
+          "${workspaceFolder}/stm32/drawer",
           "${workspaceFolder}/esp32/entrance_node",
-          "${workspaceFolder}/esp32/buzzer_tag"
+          "${workspaceFolder}/esp32/buzzer_tag",
+          "${workspaceFolder}/jetson_nano",
+          "${workspaceFolder}/web"
         ],
         "limitSymbolsToIncludedHeaders": true
       }
