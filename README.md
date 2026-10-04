@@ -429,91 +429,20 @@ Jetson Nano
 
 ```text
 Retrace-Project/
-│
-├─ esp32/                            # ESP32 노드 (VS Code + PlatformIO)
-│  ├─ entrance_node/                 # 출입 노드 · 스마트 현관등 (LOLIN D32)
-│  │  ├─ platformio.ini              # 보드 · 라이브러리 설정
-│  │  ├─ include/entrance_control.h   # PIR 필터 · 센서등 · 경고 타이머
-│  │  ├─ include/network_config.example.h # Wi-Fi · Jetson 주소 설정 예제
-│  │  ├─ include/network_config.build_check.h # 네트워크 컴파일·링크 검증용 예시값
-│  │  └─ src/main.cpp                # PIR GPIO34 · LED GPIO25 · Wi-Fi · MQTT
-│  └─ buzzer_tag/                    # 부저 태그 (ESP32-C3)
-│     ├─ platformio.ini
-│     ├─ include/buzzer_control.h    # ON/OFF 명령 처리
-│     └─ src/main.cpp                # BLE 수신 · GPIO3 부저
-│
-├─ jetson_nano/                      # 허브 (C/C++)
-│  ├─ main.cpp
-│  ├─ CMakeLists.txt
-│  ├─ vision/
-│  │  └─ Detector.h/.cpp             # 객체 탐지 · 영상 처리
-│  ├─ record/
-│  │  └─ LastSeen.h/.cpp             # 마지막 목격 정보 생성 · 관리
-│  ├─ storage/
-│  │  ├─ Database.h/.cpp             # DB 저장
-│  │  └─ ImageStorage.h/.cpp         # 스냅샷 저장
-│  ├─ communication/
-│  │  ├─ Stm32Link.h/.cpp            # USB Serial → AIM · 레이저 명령 / ← PIR 이벤트
-│  │  ├─ DrawerLink.h/.cpp           # Bluetooth → 서랍 명령 / ← 비상 버튼 이벤트
-│  │  ├─ MqttLink.h/.cpp             # MQTT ↔ 출입 노드 (움직임 · 현관등)
-│  │  ├─ BleBuzzer.h/.cpp            # BLE → 부저 태그 호출
-│  │  └─ PhoneNotifier.h/.cpp        # ntfy → 폰 사이렌 · 외출 알림
-│  └─ server/
-│     └─ Server.h/.cpp               # Web/PWA 요청 처리
-│
-├─ stm32/                            # STM32 프로젝트 묶음
-│  ├─ main_unit/                     # STM32 #1 메인 유닛: 레이저·Pan/Tilt·PIR (CubeMX + CMake)
-│  │  ├─ Core/
-│  │  │  ├─ Inc/                     # 헤더 (아래 Src와 짝)
-│  │  │  └─ Src/
-│  │  │     ├─ main.c                # CubeMX 생성 (초기화 · 메인 루프)
-│  │  │     ├─ serial_cmd.c          # UART 인터럽트 수신 · 응답
-│  │  │     ├─ cmd_parser.c          # HAL 독립 명령 해석
-│  │  │     ├─ pir_sensor.c          # PIR 입력 처리
-│  │  │     ├─ pan_tilt.c            # Pan/Tilt 서보 PWM
-│  │  │     ├─ laser.c               # 레이저 ON/OFF
-│  │  │     └─ ...                   # 그 외 CubeMX 생성 파일
-│  │  ├─ Drivers/                    # HAL · CMSIS (CubeMX 생성)
-│  │  ├─ cmake/
-│  │  ├─ CMakeLists.txt
-│  │  ├─ CMakePresets.json
-│  │  ├─ Retrace_STM32.ioc           # CubeMX 설정
-│  │  ├─ startup_stm32f411xe.s
-│  │  └─ STM32F411xx_FLASH.ld
-│  │
-│  └─ drawer/                        # STM32 #2 서랍 노드 (CubeMX + CMake)
-│     ├─ Core/
-│     │  ├─ Inc/                     # 아래 Src와 짝인 헤더
-│     │  └─ Src/
-│     │     ├─ main.c                # CubeMX 생성 (초기화 · 메인 루프)
-│     │     ├─ drawer.c              # 서랍 LED ×6 · 팝업 서보 ×6
-│     │     ├─ emergency_button.c    # 비상 버튼 입력
-│     │     ├─ serial_cmd.c          # HC-06 · USB 수신 큐 및 응답
-│     │     ├─ cmd_parser.c          # HAL 독립 서랍 명령 해석
-│     │     └─ ...                   # 그 외 CubeMX 생성 파일
-│     └─ ...                         # CubeMX 생성 (Drivers, cmake, .ioc 등)
-│
-├─ web/                              # feature/web: 정적 웹 뼈대 (기본 샘플 모드)
-│  ├─ index.html                     # 물건 찾기 · 서랍 · 부저 화면
-│  ├─ styles.css                     # PC · 휴대폰 레이아웃
-│  ├─ app.js                         # 검색 · 선택 · 요청 · 오류 표시
-│  ├─ api.js                         # 기존 HTTP 경로 · 응답 검사 · 시간 초과
-│  ├─ config.js                      # 샘플/실제 모드 · 서버 주소
-│  ├─ demo-data.js                   # 샘플 기록 (실제 요청 없음)
-│  ├─ assets/demo-scene.svg           # 샘플 장면
-│  ├─ dev-server.mjs                 # 로컬 정적 미리보기 서버
-│  ├─ tests/api.test.mjs              # API 계약 · 실패 처리 검증
-│  └─ README.md                      # 실행 · Jetson 연결 인계
-├─ docs/                             # 회로도 · 구성도 · 개발 문서
-├─ .github/
-│  └─ CODEOWNERS
-├─ CONTRIBUTING.md                   # 협업·검증·통합 순서
-├─ .gitattributes
-├─ .gitignore
+├─ stm32/               # STM32 프로젝트 (CubeMX + CMake)
+│  ├─ main_unit/        # STM32 #1 메인 유닛 — Pan/Tilt 서보 · 레이저 · PIR (USB Serial)
+│  └─ drawer/           # STM32 #2 서랍 — LED ×6 · 팝업 서보 ×6 · 비상 버튼 (HC-06)
+├─ esp32/               # ESP32 프로젝트 (PlatformIO · Arduino)
+│  ├─ entrance_node/    # ESP32 #1 현관등 — PIR · LED (Wi-Fi · MQTT)
+│  └─ buzzer_tag/       # ESP32 #2 부저 태그 — 부저 (BLE)
+├─ jetson_nano/         # 허브 — 객체 탐지 · Last Seen · DB · 서버 · 보드 통신
+├─ web/                 # 사용자 화면 (Web / PWA)
+├─ docs/                # 핀맵 · 통신 프로토콜 · 강의실 테스트 체크리스트
+├─ CONTRIBUTING.md      # 협업 규칙
 └─ README.md
 ```
 
-> 위 구조는 각 담당 feature 브랜치의 코드 기준입니다. 기능별 코드는 담당 feature 브랜치(STM32 = `feature/stm32`, ESP32 = `feature/esp32`, Jetson = `feature/jetson`, 웹 = `feature/web`)에 있고, develop에 합친 뒤 한 브랜치에서 모두 볼 수 있습니다.
+> 기능별 코드는 담당 feature 브랜치(STM32 = `feature/stm32`, ESP32 = `feature/esp32`, Jetson = `feature/jetson`, 웹 = `feature/web`)에 있습니다.
 
 ---
 
