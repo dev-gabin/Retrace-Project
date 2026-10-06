@@ -1,0 +1,5 @@
+# YOLO inference
+ultralytics==8.3.0
+
+# Camera / image processing / bounding box display
+opencv-python==5.0.0.93
