@@ -132,16 +132,21 @@ PlatformIO는 `ms-vscode.cpptools`에 의존한다. 현재 C/C++는 시험판이
 
 ### 3-2. Jetson 카메라 실행 환경
 
-Jetson 환경을 확인하여 작성한 개인용 `jetson_nano/requirements.txt`를 기준으로 관리한다.
+Jetson 카메라 실행에 필요한 Python 패키지는 `jetson_nano/requirements.txt`로 관리하고 팀원과 공유한다.
 
 현재 선언된 패키지 버전:
 
 - Ultralytics: 8.3.0
 - OpenCV: 5.0.0.93
 
-Windows 설치 버전과 다르다는 이유로 Jetson용 버전을 변경하지 않는다.
+이 파일은 Jetson 환경을 기준으로 작성했으며, Windows 개인 개발 환경과 구분한다.
+Windows 설치 버전과 다르다는 이유로 변경하지 않는다.
+
 Python·PyTorch 등 나머지 구성은 실제 Jetson 환경에 맞춰 관리한다.
-개인용 requirements 파일은 팀 공유 대상에서 제외한다.
+패키지 버전을 변경할 때는 실제 Jetson에서 설치 및 실행을 검증한 뒤 반영한다.
+
+카메라 확인용 코드인 `jetson_nano/vision/webcam_test.py`도 팀원과 공유한다.
+실행 환경, 필요한 패키지, 사용 방법을 확인한 뒤 테스트에 사용한다.
 
 ## 4. 공유 및 변경 원칙
 
