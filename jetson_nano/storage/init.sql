@@ -36,3 +36,14 @@ CREATE TABLE IF NOT EXISTS last_seen (
 INSERT INTO items (item, display_name) VALUES
  ('carkey', '차키'), ('airpods', '에어팟'), ('wallet', '지갑')
 ON DUPLICATE KEY UPDATE item=VALUES(item);
+
+-- Init ID PW is retrace
+
+CREATE USER IF NOT EXISTS 'retrace'@'localhost'
+  IDENTIFIED BY 'retrace';
+
+GRANT SELECT ON retrace.items
+  TO 'retrace'@'localhost';
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON retrace.last_seen
+  TO 'retrace'@'localhost';
