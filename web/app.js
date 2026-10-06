@@ -3,9 +3,9 @@ import { createApi, ApiError } from './api.js';
 
 const api = createApi(config);
 const isDemo = api.mode === 'demo';
-const labels = { carkey: '차키', airpods: '에어팟', glasses: '안경' };
-const icons = { carkey: 'key', airpods: 'airpods', glasses: 'glasses' };
-const descriptions = { carkey: '외출할 때 함께', airpods: '나만의 작은 음악', glasses: '매일 쓰는 선명함' };
+const labels = { carkey: '차키', airpods: '에어팟', wallet: '지갑' };
+const icons = { carkey: 'key', airpods: 'airpods', wallet: 'wallet' };
+const descriptions = { carkey: '외출할 때 함께', airpods: '나만의 작은 음악', wallet: '외출할 때 챙기는 지갑' };
 const stateLabels = { visible: '마지막 화면에서 확인', occluded: '가려진 상태로 기록', uncertain: '위치 확인 필요' };
 const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [] };
 const $ = id => document.getElementById(id);

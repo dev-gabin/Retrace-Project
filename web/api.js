@@ -1,6 +1,6 @@
 import { createDemoTransport } from './demo-data.js';
 
-export const ITEM_IDS = Object.freeze(['carkey', 'airpods', 'glasses']);
+export const ITEM_IDS = Object.freeze(['carkey', 'airpods', 'wallet']);
 const states = ['visible', 'occluded', 'uncertain'];
 
 export class ApiError extends Error {

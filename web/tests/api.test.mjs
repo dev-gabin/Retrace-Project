@@ -42,7 +42,7 @@ test('샘플 모드는 모든 조회·제어에서 네트워크를 사용하지 
   let fetched = 0;
   const api = createApi({ fetchImpl: async () => { fetched++; throw new Error('network forbidden'); } });
   const items = await api.listItems();
-  assert.deepEqual(items.map(item => item.item), ['carkey', 'airpods', 'glasses']);
+  assert.deepEqual(items.map(item => item.item), ['carkey', 'airpods', 'wallet']);
   items[0].pos_x = 999;
   assert.equal((await api.getItem('carkey')).pos_x, 412);
   for (const item of items) await api.aim(item.item);
@@ -73,7 +73,7 @@ test('기록 없음·서랍 기록·UTC 시각·사진 없는 기록을 허용�
 
 const malformed = [
   ['없는 필드', { item: 'carkey' }],
-  ['모르는 물건', { ...record(), item: 'wallet' }],
+  ['모르는 물건', { ...record(), item: 'unknown_item' }],
   ['음수 좌표', { ...record(), pos_x: -1 }],
   ['한쪽만 없는 좌표', { ...record(), pos_x: null }],
   ['소수 좌표', { ...record(), pos_y: 1.2 }],
@@ -97,7 +97,7 @@ test('목록의 잘못된 구조·중복 ID와 다른 물건 상세를 거절한
   for (const data of [[record()], { items: null }, { items: [record(), record()] }]) {
     await assert.rejects(liveWith(data).api.listItems(), hasCode('BAD_RESPONSE'));
   }
-  await assert.rejects(liveWith({ ...record(), item: 'glasses' }).api.getItem('carkey'), hasCode('BAD_RESPONSE'));
+  await assert.rejects(liveWith({ ...record(), item: 'wallet' }).api.getItem('carkey'), hasCode('BAD_RESPONSE'));
 });
 
 test('ok: true 접수 응답만 성공으로 처리한다', async () => {

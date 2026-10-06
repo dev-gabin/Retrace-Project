@@ -3,7 +3,7 @@ const now = Date.now();
 export const demoItems = [
   { item: 'carkey', pos_x: 412, pos_y: 288, seen_at: new Date(now - 7 * 60000).toISOString(), snapshot: 'snapshots/demo-carkey.svg', drawer_id: null, state: 'visible' },
   { item: 'airpods', pos_x: null, pos_y: null, seen_at: new Date(now - 18 * 60000).toISOString(), snapshot: null, drawer_id: 3, state: 'occluded' },
-  { item: 'glasses', pos_x: 172, pos_y: 224, seen_at: new Date(now - 42 * 60000).toISOString(), snapshot: 'snapshots/demo-glasses.svg', drawer_id: null, state: 'uncertain' },
+  { item: 'wallet', pos_x: 172, pos_y: 224, seen_at: new Date(now - 42 * 60000).toISOString(), snapshot: 'snapshots/demo-wallet.svg', drawer_id: null, state: 'uncertain' },
 ];
 
 export function createDemoTransport() {
