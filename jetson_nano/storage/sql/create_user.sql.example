@@ -1,0 +1,6 @@
+-- Run as administrator AFTER 001_init.sql.
+-- Local development credentials requested by the user.
+-- Copy this file and replace CHANGE_ME before running. Do not commit real credentials.
+CREATE USER 'USERNAME'@'localhost' IDENTIFIED BY 'CHANGE_PW';
+GRANT SELECT ON retrace.items TO 'USERNAME'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE ON retrace.last_seen TO 'USERNAME'@'localhost';
