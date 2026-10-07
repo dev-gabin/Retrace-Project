@@ -6,7 +6,7 @@ from ultralytics import YOLO
 
 # webcam_test.py는 jetson_nano/vision/에 있으므로 상위 폴더가 jetson_nano다.
 JETSON_DIR = Path(__file__).resolve().parents[1]
-MODEL_PATH = JETSON_DIR / "models" / "yolo" / "coco83_yolo26n_v4_earphones_mouse.pt"
+MODEL_PATH = JETSON_DIR / "models" / "yolo" / "coco83_yolo26n_v6_demo_desk.pt"
 
 CAMERA_INDEX = 0
 CONFIDENCE = 0.6
@@ -32,7 +32,7 @@ def main():
 
     if not cap.isOpened():
         print(f"[ERROR] 카메라 {CAMERA_INDEX}번을 열 수 없음")
-        print("다른 카메라 프로그램을 닫고, CAMERA_INDEX를 1로도 확인해봐.")
+        print("다른 카메라 프로그램을 닫고, CAMERA_INDEX를 1로도 확인.")
         return
 
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
