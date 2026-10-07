@@ -53,3 +53,9 @@ runs/
 .DS_Store
 Thumbs.db
 .pio/
+
+# =========================
+# Jetson_Server
+# =========================
+/jetson_nano/server_jetson/.env
+/jetson_nano/server_jetson/server/idpasswd.txt
