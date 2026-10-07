@@ -7,8 +7,14 @@
 #define SERVO_RETURN_MS       500U
 #define LED_TIMEOUT_MS        10000U
 
-static TIM_HandleTypeDef *timers[2];
-static const uint32_t channels[3] = { TIM_CHANNEL_1, TIM_CHANNEL_2, TIM_CHANNEL_3 };
+#define PCA9685_ADDRESS        (0x40U << 1)
+#define PCA9685_MODE1          0x00U
+#define PCA9685_MODE2          0x01U
+#define PCA9685_LED0_ON_L      0x06U
+#define PCA9685_PRESCALE       0xFEU
+#define PCA9685_PRESCALE_50HZ  121U
+
+static I2C_HandleTypeDef *pca_i2c;
 static GPIO_TypeDef *const led_ports[6] = {
   LED_1_GPIO_Port, LED_2_GPIO_Port, LED_3_GPIO_Port,
   LED_4_GPIO_Port, LED_5_GPIO_Port, LED_6_GPIO_Port
@@ -21,9 +27,32 @@ static ServoPhase phase;
 static int active, pending, lit;
 static uint32_t servo_since, led_since;
 
+static void pca9685_write(uint8_t reg, uint8_t value)
+{
+  if (HAL_I2C_Mem_Write(pca_i2c, PCA9685_ADDRESS, reg,
+                        I2C_MEMADD_SIZE_8BIT, &value, 1, 100) != HAL_OK) {
+    Error_Handler();
+  }
+}
+
 static void pulse(int n, uint32_t us)
 {
-  __HAL_TIM_SET_COMPARE(timers[(n - 1) / 3], channels[(n - 1) % 3], us);
+  uint8_t data[4] = {0, 0, 0, 0};
+  uint8_t reg = (uint8_t)(PCA9685_LED0_ON_L + 4U * (uint32_t)(n - 1));
+
+  if (us == 0U) {
+    data[3] = 0x10U; /* Full OFF bit. */
+  } else {
+    uint32_t count = (us * 4096U + 10000U) / 20000U;
+    if (count > 4095U) count = 4095U;
+    data[2] = (uint8_t)(count & 0xFFU);
+    data[3] = (uint8_t)((count >> 8) & 0x0FU);
+  }
+
+  if (HAL_I2C_Mem_Write(pca_i2c, PCA9685_ADDRESS, reg,
+                        I2C_MEMADD_SIZE_8BIT, data, sizeof(data), 100) != HAL_OK) {
+    Error_Handler();
+  }
 }
 
 void drawer_led_all_off(void)
@@ -46,17 +75,21 @@ void drawer_led(int n, int on)
   }
 }
 
-void drawer_init(TIM_HandleTypeDef *tim3, TIM_HandleTypeDef *tim4)
+void drawer_init(I2C_HandleTypeDef *i2c)
 {
-  timers[0] = tim3;
-  timers[1] = tim4;
+  pca_i2c = i2c;
+  pca9685_write(PCA9685_MODE1, 0x10U); /* Sleep before changing prescale. */
+  pca9685_write(PCA9685_PRESCALE, PCA9685_PRESCALE_50HZ);
+  pca9685_write(PCA9685_MODE2, 0x04U); /* Totem-pole output. */
+  pca9685_write(PCA9685_MODE1, 0x20U); /* Wake with auto-increment. */
+  HAL_Delay(1);
+  pca9685_write(PCA9685_MODE1, 0xA0U); /* Restart with auto-increment. */
+
   phase = SERVO_IDLE;
   active = pending = 0;
   drawer_led_all_off();
   for (int n = 1; n <= 6; ++n) {
     pulse(n, 0); /* Keep startup stationary until calibrated. */
-    if (HAL_TIM_PWM_Start(timers[(n - 1) / 3], channels[(n - 1) % 3]) != HAL_OK)
-      Error_Handler();
   }
 }
 
