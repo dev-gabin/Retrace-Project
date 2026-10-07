@@ -23,6 +23,10 @@ ParseResult cmd_parse(const char *line, Command *cmd)
     cmd->type = CMD_LED_ALL_OFF;
     return PARSE_OK;
   }
+  if (strcmp(line, "I2C:CHECK") == 0) {
+    cmd->type = CMD_I2C_CHECK;
+    return PARSE_OK;
+  }
   const char *p;
   int n;
   if (strncmp(line, "DRAWER:OPEN:", 12) == 0) {
@@ -45,7 +49,8 @@ ParseResult cmd_parse(const char *line, Command *cmd)
 void cmd_make_reply(ParseResult result, const Command *cmd, char *out, size_t size)
 {
   const char *name = cmd->type == CMD_PING ? "PING" :
-                     cmd->type == CMD_DRAWER ? "DRAWER" : "LED";
+                     cmd->type == CMD_DRAWER ? "DRAWER" :
+                     cmd->type == CMD_I2C_CHECK ? "I2C" : "LED";
   if (result == PARSE_OK) snprintf(out, size, "OK:%s", name);
   else if (result == PARSE_RANGE) snprintf(out, size, "ERR:%s:RANGE", name);
   else snprintf(out, size, "ERR:UNKNOWN");

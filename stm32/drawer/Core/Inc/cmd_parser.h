@@ -1,7 +1,7 @@
 #ifndef CMD_PARSER_H
 #define CMD_PARSER_H
 #include <stddef.h>
-typedef enum { CMD_PING, CMD_DRAWER, CMD_LED, CMD_LED_ALL_OFF } CmdType;
+typedef enum { CMD_PING, CMD_DRAWER, CMD_LED, CMD_LED_ALL_OFF, CMD_I2C_CHECK } CmdType;
 typedef enum { PARSE_OK, PARSE_UNKNOWN, PARSE_RANGE } ParseResult;
 typedef struct {
   CmdType type;
