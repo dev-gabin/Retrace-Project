@@ -6,7 +6,7 @@ from ultralytics import YOLO
 
 # webcam_test.py는 jetson_nano/vision/에 있으므로 상위 폴더가 jetson_nano다.
 JETSON_DIR = Path(__file__).resolve().parents[1]
-MODEL_PATH = JETSON_DIR / "models" / "yolo" / "coco83_yolo26n_v3.pt"
+MODEL_PATH = JETSON_DIR / "models" / "yolo" / "coco83_yolo26n_v4_earphones_mouse.pt"
 
 CAMERA_INDEX = 0
 CONFIDENCE = 0.6
