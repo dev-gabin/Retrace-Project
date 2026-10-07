@@ -17,7 +17,7 @@
 // 실물에서 조정할 값. HIGH로 켜지는 한 색 LED/구동 회로 기준이다.
 static constexpr uint8_t PIR_PIN = 34;
 static constexpr uint8_t LIGHT_PIN = 25;
-static constexpr uint32_t LIGHT_HOLD_MS = 10000;
+static constexpr uint32_t LIGHT_HOLD_MS = 7000;
 static constexpr uint32_t ALERT_HOLD_MS = 10000;
 static constexpr uint32_t ALERT_BLINK_MS = 250;
 static constexpr uint32_t PIR_DEBOUNCE_MS = 50;
