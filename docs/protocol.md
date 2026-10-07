@@ -281,7 +281,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 ```json
 {
-  "item": "carkey",
+  "item": "car_key",
   "pos_x": 412,
   "pos_y": 288,
   "seen_at": "2026-10-03T05:22:05.000000Z",
@@ -291,7 +291,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 }
 ```
 
-- `item`: `carkey` / `airpods` / `glasses`. 화면 이름은 웹에서 차키 / 에어팟 / 안경으로 표시합니다.
+- `item`: `car_key` / `wallet` / `earphones`. 화면 이름은 웹에서 차키 / 지갑 / 이어폰으로 표시합니다.
 - `pos_x`, `pos_y`: 저장하는 전체 프레임 JPEG의 픽셀 좌표이며, 둘 다 0 이상의 정수 또는 둘 다 `null`입니다. 좌표는 해당 이미지 범위 안에 있어야 합니다. C 구조체의 `has_position`으로 좌표 존재 여부를 구분합니다.
 - `seen_at`: UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ` 문자열 또는 `null`. 등록됐지만 관측 전인 물건은 C 조회 결과가 `RT_OK`, `observed == 0`입니다. 이 경우 JSON 임시안에서는 시간·좌표·사진·서랍 필드를 `null`로 보내고 웹은 기록 없음으로 표시합니다. 미등록 물건과 구분합니다.
 - `snapshot`: `data_dir` 기준 `snapshots/rt_<소문자 16진수 32자리>.jpg` 상대 경로 또는 `null`. 웹은 동일 서버의 `GET /snapshots/{file}`로 표시합니다. 임의 외부 주소나 상위 폴더 경로는 받지 않습니다.
@@ -314,7 +314,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 | C 필드 | 의미·규칙 | DB·HTTP 표현 |
 |---|---|---|
-| `item[33]` | 등록된 물건 ID, 최대 32자 | 예: `carkey` |
+| `item[33]` | 등록된 물건 ID, 최대 32자 | 예: `car_key` |
 | `observed` | 관측 기록 존재 여부 (0/1) | 관측 전 등록 물건도 조회 결과에 포함되며 `observed == 0` |
 | `has_position` | 좌표 존재 여부 | 좌표는 둘 다 존재하거나 둘 다 DB `NULL`; HTTP 임시안은 정수 쌍 또는 `null` 쌍 |
 | `pos_x`, `pos_y` | 전체 카메라 화면 기준 픽셀 좌표 | 저장 JPEG의 전체 프레임 기준, 화면 밖 좌표는 저장 거부 |
@@ -390,9 +390,9 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 | 이름 | 물건 |
 |---|---|
-| `carkey` | 차키 |
-| `airpods` | 에어팟 |
-| `glasses` | 안경 |
+| `car_key` | 차키 (YOLO class 80) |
+| `wallet` | 지갑 (YOLO class 81) |
+| `earphones` | 이어폰 및 충전 케이스 (YOLO class 82) |
 
 > 학습 데이터셋 클래스 이름도 위 이름과 **똑같이** 맞춥니다.
 
