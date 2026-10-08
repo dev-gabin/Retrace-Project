@@ -402,7 +402,7 @@ static void route_message(ServerState *server, ClientInfo *sender,
         (void)send_to_client(recipient, sender->id, payload);
     pthread_mutex_unlock(&server->clients_lock);
     if (recipient == NULL)
-        (void)send_to_client(sender, "SERVER", "ERROR@ROUTE:UNKNOWN_ID");
+        (void)send_to_client(sender, "SERVER", "ERR@ROUTE:UNKNOWN_ID");
 }
 
 static void dispatch_line(ServerState *server, ClientInfo *client,
@@ -416,12 +416,12 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
         char *closing = strchr(line, ']');
         size_t length;
         if (closing == NULL || closing == line + 1) {
-            (void)send_to_client(client, "SERVER", "ERROR@MESSAGE:BAD_PREFIX");
+            (void)send_to_client(client, "SERVER", "ERR@MESSAGE:BAD_PREFIX");
             return;
         }
         length = (size_t)(closing - line - 1);
         if (length >= sizeof(target)) {
-            (void)send_to_client(client, "SERVER", "ERROR@MESSAGE:ID_TOO_LONG");
+            (void)send_to_client(client, "SERVER", "ERR@MESSAGE:ID_TOO_LONG");
             return;
         }
         memcpy(target, line + 1, length);
@@ -432,7 +432,7 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
 
     if (!addressed && !is_database_command(payload) &&
         !is_ping_command(payload)) {
-        (void)send_to_client(client, "SERVER", "ERROR@MESSAGE:EXPECTED_TARGET");
+        (void)send_to_client(client, "SERVER", "ERR@MESSAGE:EXPECTED_TARGET");
         return;
     }
     if (is_server_target(target) ||
@@ -457,7 +457,7 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
                 route_message(server, client, device_id, device_command);
             else {
                 char error[64];
-                snprintf(error, sizeof(error), "ERROR@SET:%s",
+                snprintf(error, sizeof(error), "ERR@SET:%s",
                          result == 0 ? "FORMAT" : reason);
                 (void)send_to_client(client, "SERVER", error);
             }
@@ -468,7 +468,7 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
                    strncmp(payload, "ERR:", 4) == 0) {
             printf("[%s] %s\n", client->id, payload);
         } else {
-            (void)send_to_client(client, "SERVER", "ERROR@COMMAND:UNKNOWN");
+            (void)send_to_client(client, "SERVER", "ERR@COMMAND:UNKNOWN");
         }
         return;
     }
@@ -499,7 +499,7 @@ static void *client_worker(void *argument)
 
     if (rt_open(&store, server->database, error, sizeof(error)) != RT_OK) {
         fprintf(stderr, "DB open for client %s failed: %s\n", client->id, error);
-        (void)send_to_client(client, "SERVER", "ERROR@DATABASE:UNAVAILABLE");
+        (void)send_to_client(client, "SERVER", "ERR@DATABASE:UNAVAILABLE");
         goto finished;
     }
     char connected[MAX_LINE_SIZE];
@@ -552,7 +552,7 @@ static void *client_worker(void *argument)
         used -= (size_t)(line - pending);
         memmove(pending, line, used);
         if (used == sizeof(pending) - 1) {
-            (void)send_to_client(client, "SERVER", "ERROR@MESSAGE:TOO_LONG");
+            (void)send_to_client(client, "SERVER", "ERR@MESSAGE:TOO_LONG");
             break;
         }
     }
