@@ -159,8 +159,8 @@ int main(void)
     process_port(&huart1);
     process_port(&huart2);
     if (emergency_button_poll()) {
-      serial_cmd_send(&huart1, "EVT:BTN:SOS");
-      serial_cmd_send(&huart2, "EVT:BTN:SOS");
+      serial_cmd_send(&huart1, "EVT@DRAWER:SOS");
+      serial_cmd_send(&huart2, "EVT@DRAWER:SOS");
     }
   }
   /* USER CODE END 3 */
