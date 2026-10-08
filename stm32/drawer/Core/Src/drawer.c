@@ -121,13 +121,16 @@ int drawer_i2c_check(void)
   if (!pca9685_read(PCA9685_MODE1, &mode1, 1) ||
       !pca9685_read(PCA9685_MODE2, &mode2, 1) ||
       !pca9685_read(PCA9685_PRESCALE, &prescale, 1)) {
+    pca_i2c_ok = 0;
     return 0;
   }
 
-  return pca_i2c_ok &&
-         (mode1 & 0x30U) == 0x20U &&
-         (mode2 & 0x04U) == 0x04U &&
-         prescale == PCA9685_PRESCALE_50HZ;
+  pca_i2c_ok =
+      (mode1 & 0x30U) == 0x20U &&
+      (mode2 & 0x04U) == 0x04U &&
+      prescale == PCA9685_PRESCALE_50HZ;
+
+  return pca_i2c_ok;
 }
 
 int drawer_open(int n)
