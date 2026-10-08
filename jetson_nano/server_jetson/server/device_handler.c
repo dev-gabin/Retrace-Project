@@ -57,8 +57,9 @@ int device_handler_translate_set(const char *payload,
     drawer_number = number[0] - '0';
     if (drawer_number < 1 || drawer_number > 6)
         return invalid(reason, reason_capacity, "RANGE");
-    if (snprintf(device_id, device_id_capacity, "DRAWER") < 0 ||
-        strlen("DRAWER") >= device_id_capacity)
+    /* The protocol target is DRAWER; its Bluetooth TCP client ID is blt01. */
+    if (snprintf(device_id, device_id_capacity, "blt01") < 0 ||
+        strlen("blt01") >= device_id_capacity)
         return invalid(reason, reason_capacity, "INTERNAL");
     int command_length = snprintf(device_command, device_command_capacity,
                                   "DRAWER:OPEN:%ld", drawer_number);

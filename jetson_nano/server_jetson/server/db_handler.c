@@ -57,18 +57,48 @@ static int reply(pthread_mutex_t *lock, int fd, const char *requester,
 static char *next_field(char **cursor)
 {
     char *field;
-    char *comma;
+    char *separator;
     if (cursor == NULL || *cursor == NULL)
         return NULL;
     field = *cursor;
-    comma = strchr(field, ',');
-    if (comma != NULL) {
-        *comma = '\0';
-        *cursor = comma + 1;
+    separator = strchr(field, ':');
+    if (separator != NULL) {
+        *separator = '\0';
+        *cursor = separator + 1;
     } else {
         *cursor = NULL;
     }
     return field;
+}
+
+static void encode_timestamp(const char *timestamp, char encoded[32])
+{
+    char *out = encoded;
+    for (const char *p = timestamp; *p != '\0'; ++p) {
+        if (*p == ':') {
+            *out++ = '%';
+            *out++ = '3';
+            *out++ = 'A';
+        } else {
+            *out++ = *p;
+        }
+    }
+    *out = '\0';
+}
+
+static void decode_timestamp(char *timestamp)
+{
+    char *read = timestamp;
+    char *write = timestamp;
+    while (*read != '\0') {
+        if (read[0] == '%' && read[1] == '3' && read[2] == 'A') {
+            *write++ = ':';
+            read += 3;
+        } else {
+            *write++ = *read++;
+        }
+    }
+    *write = '\0';
 }
 
 static int parse_int(const char *text, int minimum, int maximum, int *value)
@@ -104,17 +134,19 @@ static int send_record(pthread_mutex_t *lock, int fd, const char *requester,
 {
     const char *timestamp = record->observed ? record->seen_at : "-";
     const char *snapshot = record->snapshot[0] ? record->snapshot : "-";
+    char encoded_timestamp[32];
+    encode_timestamp(timestamp, encoded_timestamp);
     if (record->has_position) {
         return reply(lock, fd, requester,
-                     "%s@%s,%s,%d,%d,%d,%s,%s,%d\n", kind,
+                     "%s@%s:%s:%d:%d:%d:%s:%s:%d\n", kind,
                      record->item, record->state, record->observed,
-                     record->pos_x, record->pos_y, timestamp, snapshot,
-                     record->drawer_id);
+                     record->pos_x, record->pos_y, encoded_timestamp,
+                     snapshot, record->drawer_id);
     }
     return reply(lock, fd, requester,
-                 "%s@%s,%s,%d,-,-,%s,%s,%d\n", kind,
-                 record->item, record->state, record->observed, timestamp,
-                 snapshot, record->drawer_id);
+                 "%s@%s:%s:%d:-:-:%s:%s:%d\n", kind,
+                 record->item, record->state, record->observed,
+                 encoded_timestamp, snapshot, record->drawer_id);
 }
 
 static int handle_list(RtStore *store, int fd, const char *requester,
@@ -159,13 +191,13 @@ static int handle_get(RtStore *store, int fd, const char *requester,
         return send_error(store, fd, requester, lock, "GET", rt_error(store));
 
     if (mode != NULL && strcmp(mode, "SNAPSHOT") == 0)
-        return reply(lock, fd, requester, "GET@%s,%s\n", record.item,
+        return reply(lock, fd, requester, "GET@%s:%s\n", record.item,
                      record.snapshot[0] ? record.snapshot : "-");
     if (mode != NULL && strcmp(mode, "XYXY") == 0) {
         if (record.has_position)
-            return reply(lock, fd, requester, "GET@%s,%d,%d\n", record.item,
+            return reply(lock, fd, requester, "GET@%s:%d:%d\n", record.item,
                          record.pos_x, record.pos_y);
-        return reply(lock, fd, requester, "GET@%s,-,-\n", record.item);
+        return reply(lock, fd, requester, "GET@%s:-:-\n", record.item);
     }
     if (mode != NULL)
         return send_error(store, fd, requester, lock, "GET", "Unknown GET mode");
@@ -191,6 +223,7 @@ static int handle_save(RtStore *store, int fd, const char *requester,
             return send_error(store, fd, requester, lock, "SAVE",
                               "SAVE fields cannot be empty");
     }
+    decode_timestamp(fields[4]);
     if (parse_int(fields[2], 0, INT_MAX, &x) != 0 ||
         parse_int(fields[3], 0, INT_MAX, &y) != 0 ||
         parse_int(fields[5], 0, 6, &drawer) != 0)
@@ -200,12 +233,12 @@ static int handle_save(RtStore *store, int fd, const char *requester,
     int rc = rt_save(store, fields[0], x, y, fields[4], drawer, fields[6],
                      fields[1]);
     if (rc == RT_OK)
-        return reply(lock, fd, requester, "SAVE@OK,%s\n", fields[0]);
+        return reply(lock, fd, requester, "SAVE@OK:%s\n", fields[0]);
     if (rc == RT_CLEANUP_PENDING)
-        return reply(lock, fd, requester, "SAVE@OK_CLEANUP_PENDING,%s\n",
+        return reply(lock, fd, requester, "SAVE@OK_CLEANUP_PENDING:%s\n",
                      fields[0]);
     if (rc == RT_STALE)
-        return reply(lock, fd, requester, "SAVE@STALE,%s\n", fields[0]);
+        return reply(lock, fd, requester, "SAVE@STALE:%s\n", fields[0]);
     if (rc == RT_COMMIT_UNKNOWN)
         return send_error(store, fd, requester, lock, "SAVE",
                           "RT_COMMIT_UNKNOWN; verify the row before retrying");
