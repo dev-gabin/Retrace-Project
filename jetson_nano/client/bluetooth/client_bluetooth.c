@@ -3,19 +3,21 @@
 
 #include "../common/tcp_client.h"
 
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/rfcomm.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <termios.h>
+#include <sys/socket.h>
 #include <unistd.h>
 
 #define TCP_LINE_MAX 8192
-#define SERIAL_LINE_MAX 32
+#define BLUETOOTH_LINE_MAX 32
 
 typedef struct {
     char data[TCP_LINE_MAX];
@@ -31,12 +33,12 @@ static void on_signal(int signal_number)
     stopping = 1;
 }
 
-static int write_serial_all(int fd, const void *data, size_t size)
+static int write_bluetooth_all(int fd, const void *data, size_t size)
 {
     const char *cursor = data;
 
     while (size > 0) {
-        ssize_t written = write(fd, cursor, size);
+        ssize_t written = send(fd, cursor, size, MSG_NOSIGNAL);
         if (written < 0 && errno == EINTR)
             continue;
         if (written <= 0)
@@ -47,33 +49,29 @@ static int write_serial_all(int fd, const void *data, size_t size)
     return 0;
 }
 
-static int open_serial(const char *path)
+static int connect_rfcomm(const char *mac_address, unsigned long channel)
 {
-    struct termios options;
-    int fd = open(path, O_RDWR | O_NOCTTY | O_CLOEXEC);
+    struct sockaddr_rc address = {0};
+    int fd;
 
+    if (channel < 1 || channel > 30) {
+        fprintf(stderr, "invalid RFCOMM channel: %lu\n", channel);
+        return -1;
+    }
+    fd = socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM);
     if (fd < 0) {
-        perror(path);
+        perror("create Bluetooth RFCOMM socket");
         return -1;
     }
-    if (tcgetattr(fd, &options) != 0) {
-        perror("tcgetattr");
+    address.rc_family = AF_BLUETOOTH;
+    address.rc_channel = (uint8_t)channel;
+    if (str2ba(mac_address, &address.rc_bdaddr) != 0) {
+        fprintf(stderr, "invalid Bluetooth MAC address: %s\n", mac_address);
         close(fd);
         return -1;
     }
-    cfmakeraw(&options);
-    if (cfsetispeed(&options, B9600) != 0 ||
-        cfsetospeed(&options, B9600) != 0) {
-        perror("set serial speed");
-        close(fd);
-        return -1;
-    }
-    options.c_cflag &= ~(PARENB | CSTOPB | CSIZE);
-    options.c_cflag |= CS8 | CLOCAL | CREAD;
-    options.c_cc[VMIN] = 1;
-    options.c_cc[VTIME] = 0;
-    if (tcsetattr(fd, TCSANOW, &options) != 0) {
-        perror("tcsetattr");
+    if (connect(fd, (struct sockaddr *)&address, sizeof(address)) != 0) {
+        perror("connect HC-06 RFCOMM");
         close(fd);
         return -1;
     }
@@ -83,14 +81,15 @@ static int open_serial(const char *path)
 static int send_serial_line_to_server(int socket_fd, const char *line,
                                       size_t length)
 {
-    if (length > SERIAL_LINE_MAX - 1) {
+    if (length > BLUETOOTH_LINE_MAX - 1) {
         fprintf(stderr, "drop oversized STM32 line (%zu bytes)\n", length);
         return 0;
     }
     return tcp_client_send(socket_fd, "SERVER", line, length);
 }
 
-static int send_server_line_to_serial(int serial_fd, char *line, size_t length)
+static int send_server_line_to_bluetooth(int bluetooth_fd, char *line,
+                                         size_t length)
 {
     const char *sender;
     const char *payload;
@@ -108,13 +107,13 @@ static int send_server_line_to_serial(int serial_fd, char *line, size_t length)
         (payload_size >= strlen("New connected!") &&
          memcmp(payload, "New connected!", strlen("New connected!")) == 0))
         return 0;
-    if (payload_size > SERIAL_LINE_MAX - 1) {
+    if (payload_size > BLUETOOTH_LINE_MAX - 1) {
         fprintf(stderr, "drop oversized command for STM32 (%zu bytes)\n",
                 payload_size);
         return 0;
     }
-    if (write_serial_all(serial_fd, payload, payload_size) != 0 ||
-        write_serial_all(serial_fd, "\n", 1) != 0)
+    if (write_bluetooth_all(bluetooth_fd, payload, payload_size) != 0 ||
+        write_bluetooth_all(bluetooth_fd, "\n", 1) != 0)
         return -1;
     return 0;
 }
@@ -145,8 +144,8 @@ static int consume_lines(int source_fd, int destination_fd, bool from_serial,
                                                    buffer->data, length) != 0)
                         return -1;
                 } else {
-                    if (send_server_line_to_serial(destination_fd,
-                                                   buffer->data, length) != 0)
+                    if (send_server_line_to_bluetooth(destination_fd,
+                                                      buffer->data, length) != 0)
                         return -1;
                 }
             }
@@ -157,7 +156,7 @@ static int consume_lines(int source_fd, int destination_fd, bool from_serial,
         if (buffer->dropping)
             continue;
         if (buffer->used >= sizeof(buffer->data) - 1 ||
-            (from_serial && buffer->used >= SERIAL_LINE_MAX - 1)) {
+            (from_serial && buffer->used >= BLUETOOTH_LINE_MAX - 1)) {
             fprintf(stderr, "drop overlong %s line\n",
                     from_serial ? "STM32" : "server");
             buffer->used = 0;
@@ -173,33 +172,43 @@ int main(int argc, char **argv)
 {
     const char *password = getenv("RETRACE_CLIENT_PASSWORD");
     int socket_fd = -1;
-    int serial_fd = -1;
-    LineBuffer serial_buffer = {0};
+    int bluetooth_fd = -1;
+    char *channel_end = NULL;
+    unsigned long channel;
+    LineBuffer bluetooth_buffer = {0};
     LineBuffer socket_buffer = {0};
 
-    if (argc != 5 || password == NULL || *password == '\0') {
+    if (argc != 6 || password == NULL || *password == '\0') {
         fprintf(stderr,
                 "Usage: RETRACE_CLIENT_PASSWORD=<secret> %s "
-                "<server-ip-or-host> <port> <client-id> <rfcomm-device>\n",
+                "<server-ip-or-host> <port> <client-id> "
+                "<bluetooth-mac> <rfcomm-channel>\n",
                 argv[0]);
         return EXIT_FAILURE;
     }
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
 
+    errno = 0;
+    channel = strtoul(argv[5], &channel_end, 10);
+    if (errno != 0 || channel_end == argv[5] || *channel_end != '\0' ||
+        channel < 1 || channel > 30) {
+        fprintf(stderr, "RFCOMM channel must be an integer from 1 to 30\n");
+        goto fail;
+    }
+    bluetooth_fd = connect_rfcomm(argv[4], channel);
+    if (bluetooth_fd < 0)
+        goto fail;
     socket_fd = tcp_client_connect(argv[1], argv[2], argv[3], password);
     if (socket_fd < 0)
         goto fail;
-    serial_fd = open_serial(argv[4]);
-    if (serial_fd < 0)
-        goto fail;
 
-    fprintf(stderr, "Bluetooth SPP bridge ready: client=%s serial=%s baud=9600\n",
-            argv[3], argv[4]);
+    fprintf(stderr, "Bluetooth SPP bridge ready: client=%s peer=%s channel=%lu\n",
+            argv[3], argv[4], channel);
     while (!stopping) {
         struct pollfd descriptors[2] = {
             {.fd = socket_fd, .events = POLLIN},
-            {.fd = serial_fd, .events = POLLIN}
+            {.fd = bluetooth_fd, .events = POLLIN}
         };
         int ready = poll(descriptors, 2, 500);
         if (ready < 0) {
@@ -215,30 +224,30 @@ int main(int argc, char **argv)
             goto fail;
         }
         if (descriptors[1].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-            fprintf(stderr, "HC-06 serial connection closed\n");
+            fprintf(stderr, "HC-06 Bluetooth connection closed\n");
             goto fail;
         }
         if ((descriptors[0].revents & POLLIN) &&
-            consume_lines(socket_fd, serial_fd, false, &socket_buffer) != 0) {
+            consume_lines(socket_fd, bluetooth_fd, false, &socket_buffer) != 0) {
             fprintf(stderr, "server disconnected\n");
             goto fail;
         }
         if ((descriptors[1].revents & POLLIN) &&
-            consume_lines(serial_fd, socket_fd, true, &serial_buffer) != 0) {
-            fprintf(stderr, "HC-06 serial disconnected\n");
+            consume_lines(bluetooth_fd, socket_fd, true, &bluetooth_buffer) != 0) {
+            fprintf(stderr, "HC-06 Bluetooth disconnected\n");
             goto fail;
         }
     }
 
-    if (serial_fd >= 0)
-        close(serial_fd);
+    if (bluetooth_fd >= 0)
+        close(bluetooth_fd);
     if (socket_fd >= 0)
         close(socket_fd);
     return EXIT_SUCCESS;
 
 fail:
-    if (serial_fd >= 0)
-        close(serial_fd);
+    if (bluetooth_fd >= 0)
+        close(bluetooth_fd);
     if (socket_fd >= 0)
         close(socket_fd);
     return EXIT_FAILURE;
