@@ -150,7 +150,7 @@ class Stm32Link:
                     continue
                 if not line:
                     continue
-                if line.startswith("EVT:"):
+                if line.startswith("EVT@"):
                     self._events.put(line)
                 else:
                     self._responses.put(line)
