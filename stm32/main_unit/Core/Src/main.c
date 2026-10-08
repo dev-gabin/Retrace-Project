@@ -123,7 +123,7 @@ int main(void)
     /* 2) PIR 상태가 바뀌면 이벤트 전송 */
     int motion;
     if (pir_sensor_poll(&motion)) {
-      serial_cmd_send(JETSON_UART, motion ? "EVT:PIR:1" : "EVT:PIR:0");
+      serial_cmd_send(JETSON_UART, motion ? "EVT@PIR:1" : "EVT@PIR:0");
     }
   }
   /* USER CODE END 3 */
