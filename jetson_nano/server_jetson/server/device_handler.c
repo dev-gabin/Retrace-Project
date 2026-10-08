@@ -24,6 +24,7 @@ int device_handler_translate_set(const char *payload,
     long drawer_number;
     size_t target_length;
     size_t action_length;
+    size_t i;
 
     if (reason != NULL && reason_capacity > 0)
         reason[0] = '\0';
@@ -45,9 +46,15 @@ int device_handler_translate_set(const char *payload,
 
     target_length = (size_t)(first_colon - target);
     action_length = (size_t)(second_colon - action);
-    if (target_length != sizeof("DRAWER") - 1 ||
-        memcmp(target, "DRAWER", target_length) != 0)
+    if (target_length == 0 || target_length >= device_id_capacity)
         return invalid(reason, reason_capacity, "TARGET");
+    for (i = 0; i < target_length; ++i) {
+        unsigned char ch = (unsigned char)target[i];
+        if (!((ch >= 'A' && ch <= 'Z') ||
+              (ch >= 'a' && ch <= 'z') ||
+              (ch >= '0' && ch <= '9') || ch == '_' || ch == '-'))
+            return invalid(reason, reason_capacity, "TARGET");
+    }
     if (action_length != sizeof("OPEN") - 1 ||
         memcmp(action, "OPEN", action_length) != 0)
         return invalid(reason, reason_capacity, "ACTION");
@@ -57,12 +64,12 @@ int device_handler_translate_set(const char *payload,
     drawer_number = number[0] - '0';
     if (drawer_number < 1 || drawer_number > 6)
         return invalid(reason, reason_capacity, "RANGE");
-    /* The protocol target is DRAWER; its Bluetooth TCP client ID is blt01. */
-    if (snprintf(device_id, device_id_capacity, "blt01") < 0 ||
-        strlen("blt01") >= device_id_capacity)
-        return invalid(reason, reason_capacity, "INTERNAL");
+    /* The SET target is the authenticated client ID; do not hard-code it. */
+    memcpy(device_id, target, target_length);
+    device_id[target_length] = '\0';
     int command_length = snprintf(device_command, device_command_capacity,
-                                  "DRAWER:OPEN:%ld", drawer_number);
+                                  "%.*s:OPEN:%ld", (int)target_length,
+                                  target, drawer_number);
     if (command_length < 0 ||
         (size_t)command_length >= device_command_capacity)
         return invalid(reason, reason_capacity, "INTERNAL");

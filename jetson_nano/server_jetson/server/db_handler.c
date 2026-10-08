@@ -183,7 +183,7 @@ static int handle_get(RtStore *store, int fd, const char *requester,
 
     if (item == NULL || *item == '\0' || cursor != NULL)
         return send_error(store, fd, requester, lock, "GET",
-                          "Usage: GET@ITEM[,SNAPSHOT|XYXY]");
+                          "Usage: GET@ITEM[:SNAPSHOT|XYXY]");
     rc = rt_get(store, item, &record);
     if (rc == RT_NOT_FOUND)
         return send_error(store, fd, requester, lock, "GET", "RT_NOT_FOUND");
@@ -217,7 +217,7 @@ static int handle_save(RtStore *store, int fd, const char *requester,
         fields[i] = next_field(&cursor);
     if (cursor != NULL || fields[SAVE_FIELD_COUNT - 1] == NULL)
         return send_error(store, fd, requester, lock, "SAVE",
-                          "Usage: SAVE@ITEM,SNAPSHOT,X,Y,UTC_TIME,DRAWER,STATE");
+                          "Usage: SAVE@ITEM:SNAPSHOT:X:Y:UTC_TIME:DRAWER:STATE (encode time colons as %3A)");
     for (size_t i = 0; i < SAVE_FIELD_COUNT; ++i) {
         if (fields[i] == NULL || fields[i][0] == '\0')
             return send_error(store, fd, requester, lock, "SAVE",
@@ -270,12 +270,12 @@ int db_handler_handle(RtStore *store, int socket_fd, const char *requester,
     if (strcmp(payload, "GET") == 0)
         return handled(arguments == NULL
             ? send_error(store, socket_fd, requester, send_lock, "GET",
-                         "Usage: GET@ITEM[,SNAPSHOT|XYXY]")
+                         "Usage: GET@ITEM[:SNAPSHOT|XYXY]")
             : handle_get(store, socket_fd, requester, send_lock, arguments));
     if (strcmp(payload, "SAVE") == 0)
         return handled(arguments == NULL
             ? send_error(store, socket_fd, requester, send_lock, "SAVE",
-                         "Usage: SAVE@ITEM,SNAPSHOT,X,Y,UTC_TIME,DRAWER,STATE")
+                         "Usage: SAVE@ITEM:SNAPSHOT:X:Y:UTC_TIME:DRAWER:STATE (encode time colons as %3A)")
             : handle_save(store, socket_fd, requester, send_lock, arguments));
     if (separator != NULL)
         *separator = '@';

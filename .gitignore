@@ -59,3 +59,4 @@ Thumbs.db
 # =========================
 /jetson_nano/server_jetson/.env
 /jetson_nano/server_jetson/server/idpasswd.txt
+/jetson_nano/client/bluetooth/client_bluetooth.conf

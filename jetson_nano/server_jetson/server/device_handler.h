@@ -5,7 +5,7 @@
 
 /*
  * Validate and translate the supported application SET command for a device.
- * SET@DRAWER:OPEN:n becomes the STM32 serial command DRAWER:OPEN:n.
+ * SET@clientID:OPEN:n routes to clientID and forwards clientID:OPEN:n to STM32.
  * Returns 1 for a translated SET, 0 when payload is not a SET command, or -1
  * for an invalid/unsupported SET.
  */

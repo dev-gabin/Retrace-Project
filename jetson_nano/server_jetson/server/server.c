@@ -310,6 +310,8 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
                          result == 0 ? "FORMAT" : reason);
                 (void)send_to_client(client, "SERVER", error);
             }
+        } else if (strncmp(payload, "EVT@", 4) == 0) {
+            printf("[%s] %s\n", client->id, payload);
         } else if (strncmp(payload, "EVT:", 4) == 0 ||
                    strncmp(payload, "OK:", 3) == 0 ||
                    strncmp(payload, "ERR:", 4) == 0) {
