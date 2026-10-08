@@ -149,7 +149,7 @@ set +a
 
 기본 TCP 포트는 5000이며 `RETRACE_SERVER_PORT` 또는 첫 번째 실행 인자로 바꿀 수 있습니다. 각 연결은 별도 `RtStore` 핸들을 열어 DB 연결을 스레드 간 공유하지 않습니다. 현재 실행 파일은 TCP 서버이며 Web HTTP API는 아직 구현하지 않았습니다.
 
-TCP 로그인은 기존 `[ID:비밀번호]` 한 번으로 시작합니다. 이후 DB 서버 대상 요청은 `[SQL]LIST`, `[SQL]GET@wallet`, `[SQL]SAVE@wallet:snapshots/rt_<32자리 hex>.jpg:412:288:2026-10-06T03%3A00%3A00.000001Z:0:visible`처럼 한 줄로 보냅니다. DB 응답의 발신자 표기는 `[SQL]`입니다. SAVE 필드는 콜론으로 구분하고, 시각 내부의 콜론은 `%3A`로 인코딩합니다.
+TCP 로그인은 기존 `[ID:비밀번호]` 한 번으로 시작합니다. PING 왕복 확인은 `[SERVER]PING@clientID`를 보냅니다. 서버는 대상 client에 `PING`을 중계하고, 대상에서 돌아온 `OK@PING` 또는 `ERR@PING:...` 응답 본문을 요청자에게 그대로 전달합니다. 동일 대상에 대한 확인은 한 번에 하나만 대기하며, 다른 요청이 동시에 오면 `ERR@PING:BUSY`, 3초 안에 응답이 없으면 `ERR@PING:TIMEOUT`을 반환합니다. 대상이 연결되지 않았거나 전달에 실패하면 각각 `ERR@PING:UNKNOWN_ID`, `ERR@PING:DELIVERY`입니다. DB 서버 대상 요청은 `[SQL]LIST`, `[SQL]GET@wallet`, `[SQL]SAVE@wallet:snapshots/rt_<32자리 hex>.jpg:412:288:2026-10-06T03%3A00%3A00.000001Z:0:visible`처럼 한 줄로 보냅니다. DB 응답의 발신자 표기는 `[SQL]`입니다. SAVE 필드는 콜론으로 구분하고, 시각 내부의 콜론은 `%3A`로 인코딩합니다.
 
 ### 공개 API
 

@@ -7,6 +7,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <pthread.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@
 #define MAX_LOGIN_SIZE (CLIENT_ID_SIZE + PASSWORD_SIZE + 4)
 #define MAX_LINE_SIZE 4096
 #define MAX_CREDENTIALS 256
+#define PING_TIMEOUT_MS 3000
 
 typedef struct {
     char id[CLIENT_ID_SIZE];
@@ -29,6 +31,13 @@ typedef struct {
 } Credential;
 
 typedef struct ServerState ServerState;
+
+typedef struct {
+    bool active;
+    char target_id[CLIENT_ID_SIZE];
+    char requester_id[CLIENT_ID_SIZE];
+    struct timespec deadline;
+} PendingPing;
 
 typedef struct {
     ServerState *server;
@@ -45,6 +54,7 @@ struct ServerState {
     size_t max_clients;
     size_t active_clients;
     pthread_mutex_t clients_lock;
+    PendingPing pending_pings[MAX_CLIENT_LIMIT];
 };
 
 static int send_all(int fd, const char *data, size_t size)
@@ -207,6 +217,16 @@ static int is_database_command(const char *payload)
            (length == 4 && strncmp(payload, "SAVE", length) == 0);
 }
 
+static int is_ping_command(const char *payload)
+{
+    return strcmp(payload, "PING") == 0 || strncmp(payload, "PING@", 5) == 0;
+}
+
+static int is_ping_response(const char *payload)
+{
+    return strcmp(payload, "OK@PING") == 0 || strncmp(payload, "ERR@PING:", 9) == 0;
+}
+
 static int is_server_target(const char *target)
 {
     return strcmp(target, "SERVER") == 0 || strcmp(target, "JETSON") == 0 ||
@@ -230,6 +250,131 @@ static void send_id_list(ServerState *server, ClientInfo *requester)
     }
     pthread_mutex_unlock(&server->clients_lock);
     (void)send_to_client(requester, requester->id, payload);
+}
+
+static void ping_deadline(struct timespec *deadline)
+{
+    clock_gettime(CLOCK_MONOTONIC, deadline);
+    deadline->tv_sec += PING_TIMEOUT_MS / 1000;
+    deadline->tv_nsec += (long)(PING_TIMEOUT_MS % 1000) * 1000000L;
+    if (deadline->tv_nsec >= 1000000000L) {
+        ++deadline->tv_sec;
+        deadline->tv_nsec -= 1000000000L;
+    }
+}
+
+static int ping_expired(const PendingPing *pending, const struct timespec *now)
+{
+    return now->tv_sec > pending->deadline.tv_sec ||
+           (now->tv_sec == pending->deadline.tv_sec &&
+            now->tv_nsec >= pending->deadline.tv_nsec);
+}
+
+static void expire_pending_pings(ServerState *server)
+{
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    pthread_mutex_lock(&server->clients_lock);
+    for (size_t i = 0; i < MAX_CLIENT_LIMIT; ++i) {
+        PendingPing *pending = &server->pending_pings[i];
+        if (pending->active && ping_expired(pending, &now)) {
+            ClientInfo *requester = find_client(server, pending->requester_id);
+            if (requester != NULL)
+                (void)send_to_client(requester, "SERVER", "ERR@PING:TIMEOUT");
+            memset(pending, 0, sizeof(*pending));
+        }
+    }
+    pthread_mutex_unlock(&server->clients_lock);
+}
+
+static void handle_ping_request(ServerState *server, ClientInfo *requester,
+                                const char *payload)
+{
+    const char *target_id = strncmp(payload, "PING@", 5) == 0 ? payload + 5 : "";
+    ClientInfo *target;
+    PendingPing *slot = NULL;
+    const char *error = NULL;
+
+    if (*target_id == '\0' || strlen(target_id) >= CLIENT_ID_SIZE ||
+        strchr(target_id, ':') != NULL || strchr(target_id, '@') != NULL) {
+        (void)send_to_client(requester, "SERVER", "ERR@PING:FORMAT");
+        return;
+    }
+
+    expire_pending_pings(server);
+    pthread_mutex_lock(&server->clients_lock);
+    target = find_client(server, target_id);
+    if (target == NULL) {
+        error = "ERR@PING:UNKNOWN_ID";
+    } else {
+        for (size_t i = 0; i < MAX_CLIENT_LIMIT; ++i) {
+            PendingPing *pending = &server->pending_pings[i];
+            if (pending->active && strcmp(pending->target_id, target_id) == 0) {
+                error = "ERR@PING:BUSY";
+                break;
+            }
+            if (!pending->active && slot == NULL)
+                slot = pending;
+        }
+        if (error == NULL && slot == NULL)
+            error = "ERR@PING:BUSY";
+    }
+
+    if (error == NULL) {
+        slot->active = true;
+        snprintf(slot->target_id, sizeof(slot->target_id), "%s", target_id);
+        snprintf(slot->requester_id, sizeof(slot->requester_id), "%s", requester->id);
+        ping_deadline(&slot->deadline);
+        if (send_to_client(target, requester->id, "PING") != 0) {
+            memset(slot, 0, sizeof(*slot));
+            error = "ERR@PING:DELIVERY";
+        }
+    }
+    pthread_mutex_unlock(&server->clients_lock);
+
+    if (error != NULL)
+        (void)send_to_client(requester, "SERVER", error);
+}
+
+static void handle_ping_response(ServerState *server, ClientInfo *responder,
+                                 const char *payload)
+{
+    int matched = 0;
+    expire_pending_pings(server);
+    pthread_mutex_lock(&server->clients_lock);
+    for (size_t i = 0; i < MAX_CLIENT_LIMIT; ++i) {
+        PendingPing *pending = &server->pending_pings[i];
+        if (pending->active && strcmp(pending->target_id, responder->id) == 0) {
+            ClientInfo *requester = find_client(server, pending->requester_id);
+            memset(pending, 0, sizeof(*pending));
+            if (requester != NULL)
+                (void)send_to_client(requester, "SERVER", payload);
+            matched = 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&server->clients_lock);
+    if (!matched)
+        printf("[%s] unsolicited PING response: %s\n", responder->id, payload);
+}
+
+static void cancel_client_pings(ServerState *server, ClientInfo *client)
+{
+    pthread_mutex_lock(&server->clients_lock);
+    for (size_t i = 0; i < MAX_CLIENT_LIMIT; ++i) {
+        PendingPing *pending = &server->pending_pings[i];
+        if (!pending->active)
+            continue;
+        if (strcmp(pending->target_id, client->id) == 0) {
+            ClientInfo *requester = find_client(server, pending->requester_id);
+            if (requester != NULL && requester != client)
+                (void)send_to_client(requester, "SERVER", "ERR@PING:DISCONNECTED");
+            memset(pending, 0, sizeof(*pending));
+        } else if (strcmp(pending->requester_id, client->id) == 0) {
+            memset(pending, 0, sizeof(*pending));
+        }
+    }
+    pthread_mutex_unlock(&server->clients_lock);
 }
 
 static void route_message(ServerState *server, ClientInfo *sender,
@@ -285,12 +430,18 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
         addressed = true;
     }
 
-    if (!addressed && !is_database_command(payload)) {
+    if (!addressed && !is_database_command(payload) &&
+        !is_ping_command(payload)) {
         (void)send_to_client(client, "SERVER", "ERROR@MESSAGE:EXPECTED_TARGET");
         return;
     }
-    if (is_server_target(target) || (!addressed && is_database_command(payload))) {
-        if (is_database_command(payload)) {
+    if (is_server_target(target) ||
+        (!addressed && (is_database_command(payload) || is_ping_command(payload)))) {
+        if (is_ping_command(payload)) {
+            handle_ping_request(server, client, payload);
+        } else if (is_ping_response(payload)) {
+            handle_ping_response(server, client, payload);
+        } else if (is_database_command(payload)) {
             int rc = db_handler_handle(store, client->fd, client->id, payload,
                                        &client->send_lock);
             if (rc < 0)
@@ -361,6 +512,23 @@ static void *client_worker(void *argument)
         ssize_t received;
         char *line;
         char *newline;
+        struct pollfd descriptor = {.fd = client->fd, .events = POLLIN};
+        int ready;
+
+        expire_pending_pings(server);
+        ready = poll(&descriptor, 1, 250);
+        if (ready == 0)
+            continue;
+        if (ready < 0) {
+            if (errno == EINTR)
+                continue;
+            break;
+        }
+        if ((descriptor.revents & (POLLERR | POLLNVAL)) ||
+            ((descriptor.revents & POLLHUP) && !(descriptor.revents & POLLIN)))
+            break;
+        if (!(descriptor.revents & POLLIN))
+            continue;
         received = recv(client->fd, pending + used,
                         sizeof(pending) - used - 1, 0);
         if (received == 0)
@@ -392,6 +560,7 @@ static void *client_worker(void *argument)
 finished:
     if (store != NULL)
         rt_close(store);
+    cancel_client_pings(server, client);
     pthread_mutex_lock(&server->clients_lock);
     int fd = client->fd;
     client->active = false;
