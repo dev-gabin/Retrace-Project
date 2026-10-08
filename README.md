@@ -249,13 +249,12 @@ Retrace-Project/
 │     ├─ src/main.cpp                  # BLE 수신 · 부저
 │     └─ include/buzzer_control.h      # ON/OFF 명령 처리
 │
-├─ jetson_nano/                        # 허브 (C/C++)
-│  ├─ main.cpp
+├─ jetson_nano/                        # 허브 (Python 애플리케이션 + C 서버)
+│  ├─ main.py                          # PIR 기반 카메라 추론 진입점
 │  ├─ vision/                          # 객체 탐지 · 영상 처리
 │  ├─ record/                          # Last Seen 생성 · 관리
-│  ├─ storage/                         # DB · 스냅샷 저장
-│  ├─ communication/                   # Stm32Link · DrawerLink · MqttLink · BleBuzzer · PhoneNotifier
-│  └─ server/                          # Web/PWA 요청 처리
+│  ├─ communication/                   # STM32 및 장치 연결
+│  └─ server_jetson/                   # TCP 서버 · DB · 스냅샷 저장
 │
 ├─ web/                                # 사용자 화면 (Web / PWA)
 │  ├─ index.html                       # 물건 찾기 · 서랍 · 부저 화면
