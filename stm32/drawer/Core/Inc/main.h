@@ -49,8 +49,6 @@ extern "C" {
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
-
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
@@ -61,33 +59,24 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define B1_Pin GPIO_PIN_13
 #define B1_GPIO_Port GPIOC
+#define LED_6_Pin GPIO_PIN_0
+#define LED_6_GPIO_Port GPIOC
+#define LED_5_Pin GPIO_PIN_1
+#define LED_5_GPIO_Port GPIOC
 #define LED_1_Pin GPIO_PIN_0
-#define LED_1_GPIO_Port GPIOC
+#define LED_1_GPIO_Port GPIOA
 #define LED_2_Pin GPIO_PIN_1
-#define LED_2_GPIO_Port GPIOC
-#define LED_3_Pin GPIO_PIN_2
-#define LED_3_GPIO_Port GPIOC
-#define LED_4_Pin GPIO_PIN_3
-#define LED_4_GPIO_Port GPIOC
+#define LED_2_GPIO_Port GPIOA
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
-#define SOS_BTN_Pin GPIO_PIN_4
-#define SOS_BTN_GPIO_Port GPIOA
-#define SOS_BTN_EXTI_IRQn EXTI4_IRQn
+#define LED_3_Pin GPIO_PIN_4
+#define LED_3_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
-#define LED_5_Pin GPIO_PIN_4
-#define LED_5_GPIO_Port GPIOC
-#define LED_6_Pin GPIO_PIN_5
-#define LED_6_GPIO_Port GPIOC
-#define SERVO_1_Pin GPIO_PIN_6
-#define SERVO_1_GPIO_Port GPIOC
-#define SERVO_2_Pin GPIO_PIN_7
-#define SERVO_2_GPIO_Port GPIOC
-#define SERVO_3_Pin GPIO_PIN_8
-#define SERVO_3_GPIO_Port GPIOC
+#define LED_4_Pin GPIO_PIN_0
+#define LED_4_GPIO_Port GPIOB
 #define HC06_TX_Pin GPIO_PIN_9
 #define HC06_TX_GPIO_Port GPIOA
 #define HC06_RX_Pin GPIO_PIN_10
@@ -98,12 +87,8 @@ void Error_Handler(void);
 #define TCK_GPIO_Port GPIOA
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
-#define SERVO_4_Pin GPIO_PIN_6
-#define SERVO_4_GPIO_Port GPIOB
-#define SERVO_5_Pin GPIO_PIN_7
-#define SERVO_5_GPIO_Port GPIOB
-#define SERVO_6_Pin GPIO_PIN_8
-#define SERVO_6_GPIO_Port GPIOB
+#define SOS_BTN_Pin GPIO_PIN_5
+#define SOS_BTN_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 
