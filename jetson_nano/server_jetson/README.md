@@ -2,7 +2,7 @@
 
 Jetson Nano에서 실행할 C TCP 서버와 MariaDB 저장 모듈의 안내입니다. 이 문서는 `jetson_nano/server_jetson/` 기준으로 빌드·실행 방법과 각 모듈의 책임을 설명합니다.
 
-현재 구현은 TCP 로그인, 클라이언트 메시지 라우팅, DB의 `LIST`·`GET`·`SAVE`, JPEG 스냅샷 검증 및 관리입니다. HTTP API, 카메라/AI 파이프라인, 장치 `SET`·`EVT` 동작 처리는 아직 구현되지 않았으며 `server/device_handler.c/.h`는 빈 자리표시자입니다.
+현재 구현은 TCP 로그인, 클라이언트 메시지 라우팅, DB의 `LIST`·`GET`·`SAVE`, JPEG 스냅샷 검증 및 관리입니다. 장치 `SET@clientID:OPEN:n`은 지정한 클라이언트로 라우팅하며, `EVT@clientID:SOS`는 서버 로그에만 기록합니다. HTTP API, 카메라/AI 파이프라인, 실제 SOS 후속 동작은 아직 구현되지 않았습니다.
 
 ## 빌드 대상과 구성
 
@@ -20,7 +20,7 @@ Jetson Nano에서 실행할 C TCP 서버와 MariaDB 저장 모듈의 안내입�
 | `database/db_store.c/.h` | MariaDB 연결, 관측 조회·저장, JPEG 스냅샷 관리와 복구 |
 | `database/jpeg_check.c/.h` | JPEG 디코딩·크기 검증 |
 | `database/db_store_cli.c` | 서버와 별개로 DB 저장 API를 점검하는 명령줄 도구 |
-| `server/device_handler.c/.h` | 장치 `SET`·`EVT` 처리를 추가할 예정인 빈 모듈 |
+| `server/device_handler.c/.h` | `SET@clientID:OPEN:n` 검증·대상 라우팅용 명령 생성 |
 | `database/init.sql` | DB 테이블, 초기 물건 3개, 앱 계정 생성 |
 
 ## 테이블
@@ -109,7 +109,7 @@ cmake --build jetson_nano/server_jetson/build -j2
 | `server_main.c` | 환경 설정을 읽고 `server_jetson`을 시작하는 진입점 |
 | `server/server.c` | TCP 인증·세션·메시지 라우팅 |
 | `server/db_handler.c` | LIST/GET/SAVE 프로토콜 요청을 DB 저장 API로 연결 |
-| `server/device_handler.c/.h` | 아직 동작이 없는 향후 장치 핸들러 자리표시자 |
+| `server/device_handler.c/.h` | `SET@clientID:OPEN:n` 검증·대상 라우팅용 명령 생성 |
 
 기존 빈 `.cpp` 파일은 건드리지 않았으며 빌드에 포함하지 않습니다. Python은 통합 테스트 실행에만 사용합니다.
 
@@ -149,7 +149,7 @@ set +a
 
 기본 TCP 포트는 5000이며 `RETRACE_SERVER_PORT` 또는 첫 번째 실행 인자로 바꿀 수 있습니다. 각 연결은 별도 `RtStore` 핸들을 열어 DB 연결을 스레드 간 공유하지 않습니다. 현재 실행 파일은 TCP 서버이며 Web HTTP API는 아직 구현하지 않았습니다.
 
-TCP 로그인은 기존 `[ID:비밀번호]` 한 번으로 시작합니다. 이후 DB 서버 대상 요청은 `[SQL]LIST`, `[SQL]GET@wallet`, `[SQL]SAVE@wallet,snapshots/rt_<32자리 hex>.jpg,412,288,2026-10-06T03:00:00.000001Z,0,visible`처럼 한 줄로 보냅니다. DB 응답의 발신자 표기는 `[SQL]`입니다. `@` 뒤 SAVE 필드는 쉼표로 구분합니다. 시각에 `:`가 있으므로 직렬 보드의 콜론 구분 프로토콜과는 다릅니다.
+TCP 로그인은 기존 `[ID:비밀번호]` 한 번으로 시작합니다. 이후 DB 서버 대상 요청은 `[SQL]LIST`, `[SQL]GET@wallet`, `[SQL]SAVE@wallet:snapshots/rt_<32자리 hex>.jpg:412:288:2026-10-06T03%3A00%3A00.000001Z:0:visible`처럼 한 줄로 보냅니다. DB 응답의 발신자 표기는 `[SQL]`입니다. SAVE 필드는 콜론으로 구분하고, 시각 내부의 콜론은 `%3A`로 인코딩합니다.
 
 ### 공개 API
 
