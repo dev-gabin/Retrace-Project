@@ -214,13 +214,13 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 |---|---|
 | 서랍 팝업 서보 | SG90 ×6, 서랍마다 1개 |
 | 서랍 LED | LED ×6, 열린 서랍 표시 (타이머 자동 소등) |
-| 비상 버튼 | 폰 사이렌 요청 (`EVT:BTN:SOS`) |
+| 비상 버튼 | Jetson 서버 로그 이벤트 (`EVT@clientID:SOS`); 폰 사이렌은 후속 구현 |
 | Jetson 통신 | HC-06 Bluetooth (USART1) (`protocol.md` 3장) |
 | PC 테스트 | ST-LINK VCP (USART2) — 명령 수신 · 응답 및 SOS 이벤트 |
 
 ### 3-2. 서랍 번호
 
-`protocol.md`의 `DRAWER:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
+`protocol.md`의 `clientID:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
 
 ```text
 ┌─────────┬─────────┐
