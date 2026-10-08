@@ -73,7 +73,7 @@ class Stm32Link:
         self._reader.join(timeout=1.0)
 
     def ping(self) -> None:
-        self._command("PING", "OK:PING")
+        self._command("PING", "OK@PING")
 
     def aim(self, pan: int, tilt: int) -> None:
         if not 0 <= pan <= 180 or not 0 <= tilt <= 180:
