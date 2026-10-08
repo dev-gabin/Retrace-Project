@@ -76,14 +76,14 @@ def main() -> None:
                 event = stm32.get_event(timeout=0)
                 if event is None:
                     break
-                if event == "EVT:PIR:1":
+                if event == "EVT@PIR:1":
                     pir_high = True
                     if state in {"IDLE", "GRACE"}:
                         state = "SEARCHING"
                         state_started = time.monotonic()
                         person_window.clear()
                         print("[STATE] SEARCHING")
-                elif event == "EVT:PIR:0":
+                elif event == "EVT@PIR:0":
                     pir_high = False
 
             if state == "IDLE":
