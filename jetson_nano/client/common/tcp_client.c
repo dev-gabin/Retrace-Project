@@ -60,7 +60,7 @@ static int read_login_response(int fd)
     if (strstr(response, "Authentication Error") != NULL ||
         strstr(response, "Already logged") != NULL ||
         strstr(response, "Server is full") != NULL ||
-        strstr(response, "ERROR@DATABASE") != NULL) {
+        strstr(response, "ERR@DATABASE") != NULL) {
         fprintf(stderr, "server rejected/failed login: %s\n", response);
         return -1;
     }
