@@ -3,7 +3,7 @@
 > 각 보드가 주고받는 메시지 약속입니다. **보내는 쪽과 받는 쪽 모두 이 문서를 기준으로 구현합니다.**  
 > 문서와 다르게 동작하면 **문서와 다른 쪽이 수정**합니다. 변경이 필요하면 문서를 먼저 고치고 서로 공유합니다.
 >
-> 버전: **v0.5** — HTTP API·DB 등 허브 측 항목은 초안입니다. 남은 확정 항목은 맨 아래 참고합니다.
+> 버전: **v0.6** — Jetson 저장 데이터·C Storage API는 `Retrace_API_Guide_v2.pdf` 기준이며, HTTP API·JSON은 초안입니다. 남은 확정 항목은 맨 아래 참고합니다.
 > 보드 핀 배정은 [pinmap.md](pinmap.md), 실행·검증 항목은 [통합 테스트 체크리스트](classroom_test_checklist.md)를 참고합니다.
 
 ---
@@ -265,6 +265,8 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 
 `feature/web`의 화면과 샘플 데이터는 아래 형식을 사용합니다. **기존 메서드·경로는 유지하며, 아래 JSON은 Jetson 담당자 합의 전 임시안입니다.** 서버에 이미 다른 형식이 있다면 이 문서와 `web/api.js`를 함께 맞춥니다. Jetson 서버 구현 완료를 의미하지 않습니다.
 
+저장 데이터의 시각·사진 경로·좌표·서랍 번호 표현은 8장의 Storage API 기준에 맞춥니다. `Retrace_API_Guide_v2.pdf`는 Jetson 내부 C API를 정의하므로, HTTP 경로·JSON 구조·HTTP 오류 코드와 저장 모듈 반환 코드의 변환은 웹·Jetson 담당자가 별도로 확정합니다.
+
 | 요청 | 요청 본문 | 성공 응답 (HTTP 200) |
 |---|---|---|
 | `GET /api/items` | 없음 | `{ "items": [LastSeen, ...] }` |
@@ -279,21 +281,22 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 ```json
 {
-  "item": "carkey",
+  "item": "car_key",
   "pos_x": 412,
   "pos_y": 288,
-  "seen_at": "2026-10-03T14:22:05+09:00",
-  "snapshot": "snapshots/carkey_20261003_142205.jpg",
+  "seen_at": "2026-10-03T05:22:05.000000Z",
+  "snapshot": "snapshots/rt_0123456789abcdef0123456789abcdef.jpg",
   "drawer_id": null,
   "state": "visible"
 }
 ```
 
-- `item`: `carkey` / `airpods` / `glasses`. 화면 이름은 웹에서 차키 / 에어팟 / 안경으로 표시합니다.
-- `pos_x`, `pos_y`: 이미지 픽셀 좌표, 둘 다 0 이상의 정수 또는 둘 다 `null`.
-- `seen_at`: 시간대가 있는 ISO 8601 문자열 또는 `null`. 기록이 없으면 시간·좌표·사진·서랍 필드를 `null`로 보내고 웹은 기록 없음으로 표시합니다.
-- `snapshot`: `snapshots/` 아래 상대 경로 또는 `null`. 웹은 동일 서버의 `GET /snapshots/{file}`로 표시합니다. 임의 외부 주소나 상위 폴더 경로는 받지 않습니다.
-- `drawer_id`: 1~6 정수 또는 `null`. `state`: `visible` / `occluded` / `uncertain`.
+- `item`: `car_key` / `wallet` / `earphones`. 화면 이름은 웹에서 차키 / 지갑 / 이어폰으로 표시합니다.
+- `pos_x`, `pos_y`: 저장하는 전체 프레임 JPEG의 픽셀 좌표이며, 둘 다 0 이상의 정수 또는 둘 다 `null`입니다. 좌표는 해당 이미지 범위 안에 있어야 합니다. C 구조체의 `has_position`으로 좌표 존재 여부를 구분합니다.
+- `seen_at`: UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ` 문자열 또는 `null`. 등록됐지만 관측 전인 물건은 C 조회 결과가 `RT_OK`, `observed == 0`입니다. 이 경우 JSON 임시안에서는 시간·좌표·사진·서랍 필드를 `null`로 보내고 웹은 기록 없음으로 표시합니다. 미등록 물건과 구분합니다.
+- `snapshot`: `data_dir` 기준 `snapshots/rt_<소문자 16진수 32자리>.jpg` 상대 경로 또는 `null`. 웹은 동일 서버의 `GET /snapshots/{file}`로 표시합니다. 임의 외부 주소나 상위 폴더 경로는 받지 않습니다.
+- `drawer_id`: JSON에서는 1~6 정수 또는 `null`. C API의 `0`은 서랍 없음이며 DB에서는 SQL `NULL`로 저장되므로, 서버가 JSON `null`로 변환합니다. `state`: `visible` / `occluded` / `uncertain`.
+- `observed`와 `has_position`은 C 조회 구조체의 판별 필드입니다. HTTP 응답에 이 필드를 직접 포함할지와 JSON 타입은 웹·Jetson 담당자가 확정합니다.
 - `{ "ok": true }`는 **서버의 요청 접수 응답**이며, 실제 서보 이동·레이저 점등·부저 소리 완료를 뜻하지 않습니다. 보드 응답 대기·장치 오류 처리 방식은 Jetson 담당자가 추가로 확정합니다.
 - 실패는 HTTP 4xx/5xx와 `{ "error": { "code": "ITEM_NOT_FOUND", "message": "물건 기록이 없습니다." } }` 형태의 임시안을 사용합니다. 웹은 실패·시간 초과를 표시하며, 실제 연결 실패 시 샘플 성공으로 바꾸지 않습니다.
 - 부저 켜기·끄기는 하나의 태그 기준입니다. 물건마다 별도 태그를 고르는 기능·장치 상태 조회 API는 아직 정의하지 않았습니다.
@@ -302,25 +305,94 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 ---
 
-## 8. DB 형식 (Last Seen)
+## 8. Jetson 저장 데이터·C Storage API (Last Seen)
 
-| 필드 | 타입 | 설명 | 예 |
-|---|---|---|---|
-| `item` | TEXT (키) | 물건 이름 | `carkey` |
-| `pos_x` | INTEGER | 카메라 화면 x 좌표(px) | `412` |
-| `pos_y` | INTEGER | 카메라 화면 y 좌표(px) | `288` |
-| `seen_at` | TEXT | 마지막 관찰 시각 (ISO 8601) | `2026-10-03T14:22:05` |
-| `snapshot` | TEXT | 스냅샷 파일 경로 | `snapshots/carkey_20261003_142205.jpg` |
-| `drawer_id` | INTEGER, NULL | 서랍 안이면 1~6, 아니면 NULL | `3` |
-| `state` | TEXT | `visible` / `occluded` / `uncertain` | `visible` |
+기준: 짝꿍이 작성한 `Retrace_API_Guide_v2.pdf` (Retrace Storage API 안내).
+`storage.h`에 공개된 Jetson 내부 C 저장 API를 사용하며, Python이 저장한 JPEG의 상대 경로를 검증하고 관측 정보와 함께 **MariaDB**에 기록합니다. 아래 필드는 C 조회 구조체 `RtRecord` 기준입니다. 실제 SQL 스키마와 HTTP 직렬화 구현은 Jetson 저장·서버 모듈에서 관리합니다.
+
+### 8-1. 최신 관측 정보 (`RtRecord`)
+
+| C 필드 | 의미·규칙 | DB·HTTP 표현 |
+|---|---|---|
+| `item[33]` | 등록된 물건 ID, 최대 32자 | 예: `car_key` |
+| `observed` | 관측 기록 존재 여부 (0/1) | 관측 전 등록 물건도 조회 결과에 포함되며 `observed == 0` |
+| `has_position` | 좌표 존재 여부 | 좌표는 둘 다 존재하거나 둘 다 DB `NULL`; HTTP 임시안은 정수 쌍 또는 `null` 쌍 |
+| `pos_x`, `pos_y` | 전체 카메라 화면 기준 픽셀 좌표 | 저장 JPEG의 전체 프레임 기준, 화면 밖 좌표는 저장 거부 |
+| `seen_at[28]` | UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ` | 예: `2026-10-03T05:22:05.000000Z` |
+| `snapshot[256]` | `data_dir` 기준 사진 상대 경로 | `snapshots/rt_<소문자 16진수 32자리>.jpg` |
+| `drawer_id` | C API에서 `0`은 서랍 없음, `1~6`은 서랍 번호 | `0`은 SQL `NULL`; HTTP 임시안에서는 JSON `null` |
+| `state` | `visible` / `occluded` / `uncertain` 중 하나 | 같은 문자열 사용 |
+
+- **미등록 물건**: `rt_get()`은 `RT_NOT_FOUND`를 반환합니다.
+- **등록됐지만 관측 전인 물건**: `rt_get()`은 `RT_OK`이며 `row->observed == 0`입니다. `rt_list()`에도 포함됩니다.
+- `observed`와 `has_position`은 조회 상태를 구분하는 C 필드입니다. 물리적 DB 열이나 최종 HTTP 응답 필드로 확정한 것은 아닙니다.
+
+### 8-2. 연결 설정과 핸들
+
+| `RtConfig` 필드 | 의미 |
+|---|---|
+| `host` | MariaDB 주소. 예: `127.0.0.1` |
+| `user` / `password` | MariaDB 애플리케이션 계정·비밀번호 |
+| `database` | DB 이름. 예: `retrace` |
+| `data_dir` | 사진과 잠금 파일을 둘 데이터 디렉터리 |
+| `port` | MariaDB 포트. 보통 `3306` |
+
+사용 순서: `RtConfig` 준비 → `rt_open()` → 조회·저장 → `rt_close()`.
+`RtStore`는 내부 연결을 감추는 핸들이며, **핸들 하나는 한 스레드에서 사용**합니다.
+`rt_open()` 성공 시 `*out`에 핸들을 돌려주고, 실패 시 `*out`은 `NULL`이며 호출자가 제공한 `error` 버퍼에 원인이 기록됩니다.
+
+### 8-3. 공개 C API
+
+| 함수 | 역할·호출자 처리 |
+|---|---|
+| `rt_open(RtStore **out, const RtConfig *config, char *error, size_t error_size)` | MariaDB 연결과 데이터·사진 디렉터리 준비. 성공 `RT_OK`, 실패 `RT_ERROR` |
+| `rt_close(RtStore *store)` | DB·파일 핸들 해제. 반환형 `void` |
+| `rt_error(const RtStore *store)` | 마지막 오류 문구 반환 (`const char *`). `NULL` 핸들은 `No storage handle` |
+| `rt_list(RtStore *store, RtRecord **rows, size_t *count)` | 등록 물건 전체의 최신 정보 조회. 성공 후 호출자가 `free(rows)` |
+| `rt_get(RtStore *store, const char *item, RtRecord *row)` | 물건 ID 하나의 최신 정보 조회 |
+| `rt_save(RtStore *store, const char *item, int x, int y, const char *utc_time, int drawer_id, const char *state, const char *snapshot_path)` | 미리 저장된 전체 프레임 JPEG 검증 및 관측 정보 저장 |
+| `rt_load_snapshot(RtStore *store, const char *item, unsigned char **jpeg, size_t *jpeg_size)` | 현재 사진 바이트 조회. 성공 후 호출자가 `free(*jpeg)`. 관측 또는 사진이 없으면 `RT_NOT_FOUND` |
+| `rt_recover(RtStore *store, size_t *removed)` | DB가 참조하지 않는 관리 사진·임시 파일 정리. 삭제한 파일 수를 `removed`로 반환 |
+
+`rt_close()`와 `rt_error()` 외 함수의 반환형은 `int`입니다. 반환값은 다음 절의 저장 모듈 코드이며, UART 응답이나 HTTP 상태 코드와 구분합니다.
+
+### 8-4. 반환 코드
+
+| 코드 | 값 | 의미·처리 |
+|---|---|---|
+| `RT_OK` | `0` | 성공 |
+| `RT_NOT_FOUND` | `1` | 조회한 물건 또는 사진 없음. `rt_save()`는 유효한 새 물건 ID를 자동 등록 |
+| `RT_STALE` | `2` | 저장 시각이 기존 기록과 같거나 과거라 변경하지 않음 |
+| `RT_ERROR` | `-1` | 일반 오류. 열린 핸들에서는 `rt_error()`로 원인 확인 |
+| `RT_COMMIT_UNKNOWN` | `-2` | DB 커밋 결과 불확실. 입력 사진을 보존하고 재접속·조회·복구로 결과 확인 |
+| `RT_CLEANUP_PENDING` | `3` | DB 저장은 성공했으나 이전 파일 정리 또는 동기화가 남음 |
+
+`RT_COMMIT_UNKNOWN`을 저장 실패 확정으로 처리해 입력 사진을 삭제하지 않습니다. `RT_CLEANUP_PENDING`은 DB 저장 성공과 후속 정리 상태를 구분해서 처리합니다.
+
+### 8-5. 사진 저장·복구 규칙
+
+1. Python이 전체 프레임 JPEG를 `RETRACE_DATA_DIR/snapshots`에 **완전히 기록하고 파일을 닫습니다**. 이 경로는 C의 `data_dir` 아래 사진 디렉터리와 일치시킵니다.
+2. 매 저장마다 고유한 이름을 사용하고, 다음 형식의 **상대 경로**를 `rt_save()`에 전달합니다.
+
+   ```text
+   snapshots/rt_<소문자 16진수 32자리>.jpg
+   예: snapshots/rt_0123456789abcdef0123456789abcdef.jpg
+   ```
+
+3. C 저장 모듈이 경로·일반 파일 여부·JPEG 유효성·전체 프레임 좌표 범위를 검증합니다.
+4. DB 잠금과 트랜잭션으로 최신 정보를 갱신하며, 기존 기록보다 **새로운 UTC 시각**의 요청만 반영합니다. 커밋 뒤 이전 관리 사진을 정리합니다.
+5. 호출 후 입력 사진을 변경하거나 덮어쓰지 않습니다. DB가 참조 중인 파일을 임의로 삭제하지 않습니다.
+
+저장 실패로 DB가 참조하지 않는 새 파일도 즉시 삭제되지는 않습니다. `rt_recover()`가 관리 파일명 규칙에 맞는 고아 사진과 임시 파일을 나중에 정리합니다.
+**Python 저장 작업이 멈춰 있을 때만 복구를 실행**합니다. 저장과 동시에 실행하면 DB에 등록되기 전의 새 파일을 지울 수 있습니다. DB 오류나 참조 중인 사진 누락이 있으면 복구 중 삭제를 멈춥니다.
 
 ### 물건 이름 (item)
 
 | 이름 | 물건 |
 |---|---|
-| `carkey` | 차키 |
-| `airpods` | 에어팟 |
-| `glasses` | 안경 |
+| `car_key` | 차키 (YOLO class 80) |
+| `wallet` | 지갑 (YOLO class 81) |
+| `earphones` | 이어폰 및 충전 케이스 (YOLO class 82) |
 
 > 학습 데이터셋 클래스 이름도 위 이름과 **똑같이** 맞춥니다.
 
@@ -332,6 +404,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 - [ ] 서랍 LED 10초 소등 / 현관등 기본 점등 10초·ALERT 10초·깜빡임 250ms를 실물에 맞춰 보정
 - [ ] ntfy 서버 포트
 - [ ] HTTP API JSON 임시안(7-1)을 Jetson·웹 담당자가 함께 확정, 장치 오류·완료 응답 방식 정의
+- [ ] Storage API의 `observed`·`has_position`과 반환 코드를 HTTP JSON·상태 코드로 변환하는 규칙 확정
 - [ ] 추적 물건 목록 최종 확정 (안경 / 지갑)
 
 ---
@@ -345,3 +418,4 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 | v0.3 | 이벤트 끼어들기 처리 규칙, `PING` 응답 `OK:PING`으로 통일, 형식 설명(`:` / `,`) 수정, BLE 값 ASCII 명시, ntfy 제목 영문·본문 한글로 통일, MQTT 대소문자 범위(연결 상태는 관례대로 소문자) 명시 |
 | v0.4 | 서랍 번호 배치를 pinmap.md 3-2 기준(2열 × 3행)으로 통일 |
 | v0.5 | 현관등 PIR·ALERT·QoS 1 구현 기준 명시, 부저 자동 정지 제거 및 웹 끄기 요청 기준 반영 |
+| v0.6 | `Retrace_API_Guide_v2.pdf` 기준으로 MariaDB·C Storage API, 관측 여부·좌표 여부, UTC 시각·사진 경로, 반환 코드·복구 규칙 반영. 관련 Last Seen JSON 예제 수정, HTTP 형식은 초안 유지 |

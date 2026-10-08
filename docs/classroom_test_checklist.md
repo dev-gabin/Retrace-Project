@@ -113,15 +113,15 @@ cmake --build stm32/main_unit/build/Debug
 | □ | □ | `LED:6:ON` | `OK:LED`, 1번 OFF / 6번 ON |
 | □ | □ | `LED:1:OFF` | `OK:LED`, 6번은 유지 |
 | □ | □ | `LED:ALL:OFF` | `OK:LED`, 전체 소등 |
-| □ | □ | `DRAWER:OPEN:3` | `OK:DRAWER`, 3번 LED ON, 밀기 → 서보 복귀 → Pulse 0 |
-| □ | □ | 동작 중 `DRAWER:OPEN:6` | 이전 LED 즉시 OFF, 6번 LED ON, 이전 서보 복귀 후 6번 동작 |
-| □ | □ | 복귀 중 여러 `DRAWER:OPEN` | 마지막 요청 예약, 접수한 요청마다 `OK:DRAWER` |
+| □ | □ | `clientID:OPEN:3` | `OK:DRAWER`, 3번 LED ON, 밀기 → 서보 복귀 → Pulse 0 |
+| □ | □ | 동작 중 `clientID:OPEN:6` | 이전 LED 즉시 OFF, 6번 LED ON, 이전 서보 복귀 후 6번 동작 |
+| □ | □ | 복귀 중 여러 `clientID:OPEN` | 마지막 요청 예약, 접수한 요청마다 `OK:DRAWER` |
 | □ | □ | 마지막 LED ON 이후 10초 | 자동 소등, 명령 수신 계속 가능 |
-| □ | □ | `DRAWER:OPEN:0`, `DRAWER:OPEN:7` | `ERR:DRAWER:RANGE`, 동작 변경 없음 |
+| □ | □ | `clientID:OPEN:0`, `clientID:OPEN:7` | `ERR:DRAWER:RANGE`, 동작 변경 없음 |
 | □ | □ | `LED:7:ON` | `ERR:LED:RANGE` |
 | □ | □ | 소문자·형식 오류·32바이트 초과 | `ERR:UNKNOWN`, 구동 없음 |
 | □ | □ | 짧은 연속 명령 | UART별 8줄 큐로 순서대로 처리, 큐 초과 줄은 실행하지 않고 `ERR:UNKNOWN` |
-| □ | □ | SOS 버튼 50ms 이상 누름 | `EVT:BTN:SOS` 한 번, 양쪽 UART에서 확인 |
+| □ | □ | SOS 버튼 50ms 이상 누름 | `EVT@clientID:SOS` 한 번, 양쪽 UART에서 확인 |
 | □ | □ | SOS 길게 누름 / 떼고 다시 누름 | 유지 중 추가 이벤트 없음 / 안정적인 해제 후 재누름 이벤트 한 번 |
 
 LED는 **서랍 닫힘을 감지하지 않고 시간으로 소등**한다. 사람이 먼저 닫아도 남은 시간 동안 켜져 있는 것이 현재 동작이다.
@@ -232,7 +232,7 @@ USB 로그는 115200이다. `BUZZER ON`, `BUZZER OFF`, `BLE disconnected; buzzer
 |---|---|---|
 | □ | 웹에서 물건 위치 안내 | Jetson이 목표 각도를 계산하고 STM32에 `AIM` 전달, 이동 후 레이저 제어 |
 | □ | 웹에서 1~6번 서랍 선택 | HC-06을 통해 해당 서랍 LED ON + 서보 밀기·복귀, LED 10초 후 OFF |
-| □ | 서랍 SOS 버튼 누르기 | `EVT:BTN:SOS`가 Jetson에 도착하고 폰 알림·사이렌 요청으로 이어짐 |
+| □ | 서랍 SOS 버튼 누르기 | `EVT@clientID:SOS`가 Jetson 서버 로그에 기록됨 (폰 알림·사이렌은 후속 구현) |
 | □ | 웹에서 부저 **찾기** | Jetson이 BLE `1` 전송, 부저 ON |
 | □ | 부저 연결을 유지하며 30초 이상 기다리기 | 자동으로 꺼지지 않고 계속 울림 |
 | □ | 웹에서 부저 **소리 끄기** | Jetson이 BLE `0` 전송, 부저 OFF |

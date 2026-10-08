@@ -1,0 +1,6 @@
+# Example only. Copy to idpasswd.txt and replace these credentials before deployment.
+# Format: CLIENT_ID PASSWORD (one client per line)
+admin admin
+user1 passwd1
+user2 passwd2
+blt01 CHANGE_ME

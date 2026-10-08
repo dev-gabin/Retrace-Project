@@ -1,0 +1,7 @@
+# Local runtime settings for run_client_bluetooth.sh.
+# Copy this file to client_bluetooth.conf and edit the values if needed.
+RETRACE_SERVER_HOST=127.0.0.1
+RETRACE_SERVER_PORT=5000
+RETRACE_CLIENT_ID=blt01
+RETRACE_BLUETOOTH_MAC=98:DA:60:0D:AA:D5
+RETRACE_RFCOMM_CHANNEL=1
