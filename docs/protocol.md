@@ -361,7 +361,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 | 코드 | 값 | 의미·처리 |
 |---|---|---|
 | `RT_OK` | `0` | 성공 |
-| `RT_NOT_FOUND` | `1` | 물건 또는 사진 없음. `rt_save()`에서는 미등록 물건 |
+| `RT_NOT_FOUND` | `1` | 조회한 물건 또는 사진 없음. `rt_save()`는 유효한 새 물건 ID를 자동 등록 |
 | `RT_STALE` | `2` | 저장 시각이 기존 기록과 같거나 과거라 변경하지 않음 |
 | `RT_ERROR` | `-1` | 일반 오류. 열린 핸들에서는 `rt_error()`로 원인 확인 |
 | `RT_COMMIT_UNKNOWN` | `-2` | DB 커밋 결과 불확실. 입력 사진을 보존하고 재접속·조회·복구로 결과 확인 |

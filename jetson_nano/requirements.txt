@@ -3,3 +3,6 @@ ultralytics==8.3.0
 
 # Camera / image processing / bounding box display
 opencv-python==5.0.0.93
+
+# STM32 main-unit USB serial link
+pyserial==3.5

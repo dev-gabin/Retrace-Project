@@ -21,12 +21,12 @@ Jetson Nano에서 실행할 C TCP 서버와 MariaDB 저장 모듈의 안내입�
 | `database/jpeg_check.c/.h` | JPEG 디코딩·크기 검증 |
 | `database/db_store_cli.c` | 서버와 별개로 DB 저장 API를 점검하는 명령줄 도구 |
 | `server/device_handler.c/.h` | `SET@clientID:OPEN:n` 검증·대상 라우팅용 명령 생성 |
-| `database/init.sql` | DB 테이블, 초기 물건 3개, 앱 계정 생성 |
+| `database/init.sql` | DB 테이블, 초기 물건 3개, 앱 계정과 자동 물건 등록 권한 생성 |
 
 ## 테이블
 
 `items`: 물건 목록. `item` 기본 키와 한글 표시명 `display_name`을 저장합니다.
-초기 목록은 `carkey`(차키), `airpods`(에어팟), `wallet`(지갑) 세 개입니다. `glasses`는 현재 스키마의 초기 목록에 포함되지 않습니다.
+초기 목록은 `carkey`(차키), `airpods`(에어팟), `wallet`(지갑) 세 개입니다. `rt_save`는 유효한 새 물건 ID를 처음 저장할 때 `items`에 자동 등록하며, 이때 표시명은 우선 물건 ID와 같게 저장합니다.
 
 `last_seen`: 관찰한 물건의 최신 기록. `item`이 기본 키이자 `items`의 외래 키이므로 물건별 최대 한 행입니다.
 
@@ -60,7 +60,7 @@ mysql --defaults-extra-file=jetson_nano/.local/mysql-client.cnf
 ```
 
 초기화 SQL은 `retrace` 애플리케이션 계정을 만들고 초기 비밀번호 `retrace`를 설정합니다. 이는 개발 초기값이므로 실제 장치에 배포하기 전에 변경하세요. 실행 시 서버는 `RETRACE_DB_PASSWORD`를 환경 변수에서 읽습니다. 비밀이 든 `.local/db.env`와 `mysql-client.cnf`는 Git에 추가하지 말고, Jetson에서는 파일 권한을 제한하세요.
-`retrace`는 items 조회와 last_seen 조회·추가·수정·삭제만 가능해야 합니다. 테이블 생성/삭제, 사용자 관리, 다른 DB 접근 권한은 부여하지 않습니다.
+`retrace`는 items 조회·추가와 last_seen 조회·추가·수정·삭제만 가능해야 합니다. 테이블 생성/삭제, 사용자 관리, 다른 DB 접근 권한은 부여하지 않습니다.
 Windows의 localhost:3306 TCP 연결도 확인했지만, DB 계정의 SQL 로그인 검증은 WSL 안에서 수행했습니다.
 
 ## 새 환경에 구축
@@ -79,7 +79,7 @@ sudo mysql --default-character-set=utf8mb4 < jetson_nano/server_jetson/database/
 
 1. Python이 전체 화면 사진을 고유한 새 파일명으로 `snapshots/`에 완전히 저장한 뒤 경로를 전달합니다. 파일명은 `rt_<32 lowercase hex digits>.jpg` 형식이어야 합니다. `rt_save`는 파일을 검증하고 상대 경로를 DB에 기록합니다.
 2. DB별 named lock과 저장 폴더 파일 잠금을 잡고 기존 관찰 시각을 비교합니다. 소규모 물건 목록이므로 저장 요청을 직렬 처리합니다. 늦게 도착한 과거 관찰이 최신 기록을 덮어쓰면 안 됩니다.
-3. 준비된 문장(prepared statement)으로 해당 물건의 행을 INSERT 또는 UPDATE하고 COMMIT합니다.
+3. 처음 보는 유효한 물건 ID는 `items`에 자동 등록하고, 준비된 문장(prepared statement)으로 해당 물건의 최신 관찰 행을 INSERT 또는 UPDATE한 뒤 함께 COMMIT합니다.
 4. 커밋 성공 뒤 이전 사진을 삭제합니다. 저장/DB 실패 시 기존 기록을 유지하고 새 임시 파일을 정리합니다.
 
 최종적으로 물건별 최신 사진 하나만 유지합니다. 갱신 도중에는 잠시 두 파일이 존재할 수 있습니다.
@@ -111,7 +111,7 @@ cmake --build jetson_nano/server_jetson/build -j2
 | `server/db_handler.c` | LIST/GET/SAVE 프로토콜 요청을 DB 저장 API로 연결 |
 | `server/device_handler.c/.h` | `SET@clientID:OPEN:n` 검증·대상 라우팅용 명령 생성 |
 
-기존 빈 `.cpp` 파일은 건드리지 않았으며 빌드에 포함하지 않습니다. Python은 통합 테스트 실행에만 사용합니다.
+Jetson의 카메라·Last Seen·STM32 연결은 Python 모듈을 사용하며, TCP 서버와 DB 저장 계층은 기존 C 구현을 사용합니다.
 
 ```sh
 sudo apt-get update
@@ -156,7 +156,7 @@ TCP 로그인은 기존 `[ID:비밀번호]` 한 번으로 시작합니다. PING 
 - `rt_open` / `rt_close`: 설정으로 접속 및 자원 정리.
 - `rt_list`: 등록된 물건을 모두 조회; 아직 관찰하지 않은 물건도 포함.
 - `rt_get`: 물건의 최신 메타데이터 조회.
-- `rt_save`: 이미 저장한 관리 JPEG 경로와 관찰 정보를 DB에 연결. 파일은 호출자가 먼저 완전히 저장하고 이후 변경하지 않아야 합니다. DB 저장에 실패한 미참조 파일은 `rt_recover`가 정리할 수 있습니다.
+- `rt_save`: 이미 저장한 관리 JPEG 경로와 관찰 정보를 DB에 연결. 유효한 새 물건 ID는 자동 등록합니다. 파일은 호출자가 먼저 완전히 저장하고 이후 변경하지 않아야 합니다. DB 저장에 실패한 미참조 파일은 `rt_recover`가 정리할 수 있습니다.
 - `rt_load_snapshot`: 현재 사진 바이트 조회. 파일 교체와 동시에 실행해도 저장 잠금으로 보호.
 - `rt_recover`: 시작 시 또는 오류 복구 시 명시적으로 호출하는 고아 파일 정리.
 
@@ -169,7 +169,7 @@ TCP 로그인은 기존 `[ID:비밀번호]` 한 번으로 시작합니다. PING 
 | API 결과 | CLI 종료 코드 | 의미 |
 |---|---|---|
 | RT_OK | 0 | 성공 |
-| RT_NOT_FOUND | 2 | 미등록 물건 또는 사진 없음 |
+| RT_NOT_FOUND | 2 | 조회한 물건 또는 사진 없음 |
 | RT_STALE | 3 | 같거나 과거 시각; 변경 없음 |
 | RT_CLEANUP_PENDING | 4 | DB 저장은 성공, 이전 파일 정리/동기화 재시도 필요 |
 | RT_COMMIT_UNKNOWN | 5 | 커밋 응답 불확실; 사진 보존, 핸들을 닫고 재접속·조회·recover |

@@ -197,6 +197,25 @@ static int own_name(const char *name, int temporary) {
 static int own_path(const char *path) {
     return path && !strncmp(path,"snapshots/",10) && own_name(path+10,0);
 }
+static int ensure_item(RtStore *s, const char *item) {
+    const char *sql="INSERT INTO items(item,display_name) VALUES(?,?) "
+        "ON DUPLICATE KEY UPDATE item=VALUES(item)";
+    MYSQL_STMT *st=mysql_stmt_init(s->db);
+    if (!st) return errorf(s,"Cannot allocate item statement");
+    MYSQL_BIND p[2]; memset(p,0,sizeof(p));
+    unsigned long length=(unsigned long)strlen(item);
+    for (int i=0;i<2;i++) {
+        p[i].buffer_type=MYSQL_TYPE_STRING;
+        p[i].buffer=(void *)item;
+        p[i].buffer_length=length;
+        p[i].length=&length;
+    }
+    int rc=RT_OK;
+    if (mysql_stmt_prepare(st,sql,(unsigned long)strlen(sql)) ||
+        mysql_stmt_bind_param(st,p) || mysql_stmt_execute(st))
+        rc=errorf(s,"Register item: %s",mysql_stmt_error(st));
+    mysql_stmt_close(st); return rc;
+}
 static int upsert(RtStore *s, const char *item, int x, int y, const char *timestamp,
                   const char *path, int drawer, const char *state) {
     const char *sql="INSERT INTO last_seen(item,pos_x,pos_y,seen_at,snapshot,drawer_id,state) "
@@ -243,6 +262,7 @@ int rt_save(RtStore *s, const char *item, int x, int y, const char *stamp,
         return errorf(s,"Invalid observation or managed snapshot path");
     if (lock_store(s)) return RT_ERROR;
     RtRecord old;
+    int item_exists=1;
     unsigned char *jpeg=NULL;
     size_t jpeg_size=0;
     int transaction=0;
@@ -255,12 +275,17 @@ int rt_save(RtStore *s, const char *item, int x, int y, const char *stamp,
     free(jpeg); jpeg=NULL;
     if (x>=width || y>=height) { rc=errorf(s,"Coordinates outside full camera frame"); goto done; }
     rc=rt_get(s,item,&old);
-    if (rc!=RT_OK) goto done;
+    if (rc==RT_NOT_FOUND) {
+        memset(&old,0,sizeof(old));
+        item_exists=0;
+        rc=RT_OK;
+    } else if (rc!=RT_OK) goto done;
     if (old.observed && strcmp(stamp,old.seen_at)<=0) { rc=RT_STALE; goto done; }
     /* The caller has already atomically published this managed snapshot. */
     crash_at("after_publish");
     if ((rc=query(s,"START TRANSACTION"))) goto done;
     transaction=1;
+    if (!item_exists && (rc=ensure_item(s,item))) goto done;
     if ((rc=upsert(s,item,x,y,stamp,snapshot_path,drawer,state))) goto done;
     crash_at("before_commit");
     if (mysql_commit(s->db)) {

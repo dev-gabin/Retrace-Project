@@ -42,7 +42,7 @@ ON DUPLICATE KEY UPDATE item=VALUES(item);
 CREATE USER IF NOT EXISTS 'retrace'@'localhost'
   IDENTIFIED BY 'retrace';
 
-GRANT SELECT ON retrace.items
+GRANT SELECT, INSERT ON retrace.items
   TO 'retrace'@'localhost';
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON retrace.last_seen
