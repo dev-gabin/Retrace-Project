@@ -51,7 +51,8 @@ void cmd_make_reply(ParseResult result, const Command *cmd, char *out, size_t si
   const char *name = cmd->type == CMD_PING ? "PING" :
                      cmd->type == CMD_DRAWER ? "DRAWER" :
                      cmd->type == CMD_I2C_CHECK ? "I2C" : "LED";
-  if (result == PARSE_OK) snprintf(out, size, "OK:%s", name);
+  if (result == PARSE_OK && cmd->type == CMD_PING) snprintf(out, size, "OK@PING");
+  else if (result == PARSE_OK) snprintf(out, size, "OK:%s", name);
   else if (result == PARSE_RANGE) snprintf(out, size, "ERR:%s:RANGE", name);
   else snprintf(out, size, "ERR:UNKNOWN");
 }

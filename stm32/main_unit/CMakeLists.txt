@@ -45,6 +45,11 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    Core/Src/serial_cmd.c
+    Core/Src/cmd_parser.c
+    Core/Src/pan_tilt.c
+    Core/Src/laser.c
+    Core/Src/pir_sensor.c
 )
 
 # Add include paths

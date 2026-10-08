@@ -43,7 +43,7 @@ USB Serial과 Bluetooth(HC-06) 모두 **같은 문자 형식**을 씁니다. PC 
 | 성공 응답 | `OK:명령` | `OK:AIM` |
 | 실패 응답 | `ERR:명령:이유` | `ERR:AIM:RANGE` |
 | 모르는 명령 | `ERR:UNKNOWN` | |
-| 보드가 먼저 보내는 이벤트 | `EVT:종류:값` | `EVT:PIR:1` |
+| 보드가 먼저 보내는 이벤트 | `EVT@종류:값` | `EVT@PIR:1` |
 
 - 명령을 받으면 **반드시 `OK` 또는 `ERR`로 응답**합니다.
 - Jetson은 응답을 **1초** 기다리고, 없으면 **1회 재전송**합니다. 그래도 없으면 연결 오류로 처리합니다.
@@ -51,7 +51,7 @@ USB Serial과 Bluetooth(HC-06) 모두 **같은 문자 형식**을 씁니다. PC 
 
 ```text
 Jetson → AIM:90,90
-STM32  → EVT:PIR:1     ← 응답 대기 중 이벤트 도착 → 이벤트로 처리
+STM32  → EVT@PIR:1     ← 응답 대기 중 이벤트 도착 → 이벤트로 처리
 STM32  → OK:AIM        ← 이게 AIM의 응답
 ```
 
@@ -59,7 +59,7 @@ STM32  → OK:AIM        ← 이게 AIM의 응답
 
 | 명령 | 응답 | 설명 |
 |---|---|---|
-| `PING` | `OK:PING` | 연결 확인 |
+| `PING` | `OK@PING` | 연결 확인 |
 
 ---
 
@@ -89,8 +89,8 @@ STM32  → OK:AIM        ← 이게 AIM의 응답
 
 | 이벤트 | 설명 |
 |---|---|
-| `EVT:PIR:1` | 움직임 감지 시작 |
-| `EVT:PIR:0` | 움직임 감지 종료 |
+| `EVT@PIR:1` | 움직임 감지 시작 |
+| `EVT@PIR:0` | 움직임 감지 종료 |
 
 예시:
 
@@ -99,7 +99,7 @@ Jetson → AIM:120,45
 STM32  → OK:AIM
 Jetson → LASER:ON
 STM32  → OK:LASER
-STM32  → EVT:PIR:1
+STM32  → EVT@PIR:1
 ```
 
 ---
@@ -291,7 +291,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 }
 ```
 
-- `item`: `car_key` / `wallet` / `earphones`. 화면 이름은 웹에서 차키 / 지갑 / 이어폰으로 표시합니다.
+- `item`: `carkey` / `airpods` / `wallet`. 화면 이름은 웹에서 차키 / 에어팟 / 지갑으로 표시합니다.
 - `pos_x`, `pos_y`: 저장하는 전체 프레임 JPEG의 픽셀 좌표이며, 둘 다 0 이상의 정수 또는 둘 다 `null`입니다. 좌표는 해당 이미지 범위 안에 있어야 합니다. C 구조체의 `has_position`으로 좌표 존재 여부를 구분합니다.
 - `seen_at`: UTC `YYYY-MM-DDTHH:MM:SS.ffffffZ` 문자열 또는 `null`. 등록됐지만 관측 전인 물건은 C 조회 결과가 `RT_OK`, `observed == 0`입니다. 이 경우 JSON 임시안에서는 시간·좌표·사진·서랍 필드를 `null`로 보내고 웹은 기록 없음으로 표시합니다. 미등록 물건과 구분합니다.
 - `snapshot`: `data_dir` 기준 `snapshots/rt_<소문자 16진수 32자리>.jpg` 상대 경로 또는 `null`. 웹은 동일 서버의 `GET /snapshots/{file}`로 표시합니다. 임의 외부 주소나 상위 폴더 경로는 받지 않습니다.
@@ -314,7 +314,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 | C 필드 | 의미·규칙 | DB·HTTP 표현 |
 |---|---|---|
-| `item[33]` | 등록된 물건 ID, 최대 32자 | 예: `car_key` |
+| `item[33]` | 등록된 물건 ID, 최대 32자 | 예: `carkey` |
 | `observed` | 관측 기록 존재 여부 (0/1) | 관측 전 등록 물건도 조회 결과에 포함되며 `observed == 0` |
 | `has_position` | 좌표 존재 여부 | 좌표는 둘 다 존재하거나 둘 다 DB `NULL`; HTTP 임시안은 정수 쌍 또는 `null` 쌍 |
 | `pos_x`, `pos_y` | 전체 카메라 화면 기준 픽셀 좌표 | 저장 JPEG의 전체 프레임 기준, 화면 밖 좌표는 저장 거부 |
@@ -415,7 +415,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 |---|---|
 | v0.1 | 최초 초안 |
 | v0.2 | 대소문자 규칙(**대문자만**, 소문자는 `ERR:UNKNOWN`), 보드 이름·담당·폴더 표기 통일, 서랍 번호 그림, STM32 #2 USART1·디버그 USART2 구분, 핀맵 문서 연결 |
-| v0.3 | 이벤트 끼어들기 처리 규칙, `PING` 응답 `OK:PING`으로 통일, 형식 설명(`:` / `,`) 수정, BLE 값 ASCII 명시, ntfy 제목 영문·본문 한글로 통일, MQTT 대소문자 범위(연결 상태는 관례대로 소문자) 명시 |
+| v0.3 | 이벤트 끼어들기 처리 규칙, 당시 `PING` 응답 형식 통일, 형식 설명(`:` / `,`) 수정, BLE 값 ASCII 명시, ntfy 제목 영문·본문 한글로 통일, MQTT 대소문자 범위(연결 상태는 관례대로 소문자) 명시 |
 | v0.4 | 서랍 번호 배치를 pinmap.md 3-2 기준(2열 × 3행)으로 통일 |
 | v0.5 | 현관등 PIR·ALERT·QoS 1 구현 기준 명시, 부저 자동 정지 제거 및 웹 끄기 요청 기준 반영 |
 | v0.6 | `Retrace_API_Guide_v2.pdf` 기준으로 MariaDB·C Storage API, 관측 여부·좌표 여부, UTC 시각·사진 경로, 반환 코드·복구 규칙 반영. 관련 Last Seen JSON 예제 수정, HTTP 형식은 초안 유지 |

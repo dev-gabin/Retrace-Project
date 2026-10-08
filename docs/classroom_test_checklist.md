@@ -69,14 +69,14 @@ cmake --build stm32/main_unit/build/Debug
 
 | 확인 | 입력·조작 | 예상 결과 |
 |---|---|---|
-| □ | `PING` | `OK:PING` |
+| □ | `PING` | `OK@PING` |
 | □ | `AIM:90,45` | `OK:AIM`, Pan 90° / Tilt 45°에 해당하는 PWM |
 | □ | `AIM:0,0`, `AIM:180,180` | `OK:AIM`, 보정한 범위 내 이동 |
 | □ | `AIM:181,90` | `ERR:AIM:RANGE`, 이전 위치 유지 |
 | □ | `aim:90,45` | `ERR:UNKNOWN` |
 | □ | `LASER:ON`, `LASER:OFF` | 각각 `OK:LASER`, 출력 ON / OFF |
 | □ | `HOME` | `OK:HOME`, Pan/Tilt 90° + 레이저 OFF |
-| □ | PIR 입력 HIGH / LOW 유지 | 50ms 필터 후 `EVT:PIR:1` / `EVT:PIR:0` |
+| □ | PIR 입력 HIGH / LOW 유지 | 50ms 필터 후 `EVT@PIR:1` / `EVT@PIR:0` |
 | □ | B1 버튼 | PIR 이벤트 오발행 없음 |
 
 - [ ] 실제 SG90 범위에 맞춰 `pan_tilt.c`의 최소·최대 펄스 보정 (현재 임시 1000~2000µs).
@@ -108,7 +108,7 @@ cmake --build stm32/main_unit/build/Debug
 | USB | HC-06 | 입력·조작 | 예상 결과 |
 |---|---|---|---|
 | □ | □ | 전원 ON | LED OFF, 서보 Pulse 0 |
-| □ | □ | `PING` | `OK:PING` |
+| □ | □ | `PING` | `OK@PING` |
 | □ | □ | `LED:1:ON` | `OK:LED`, 1번만 점등 |
 | □ | □ | `LED:6:ON` | `OK:LED`, 1번 OFF / 6번 ON |
 | □ | □ | `LED:1:OFF` | `OK:LED`, 6번은 유지 |

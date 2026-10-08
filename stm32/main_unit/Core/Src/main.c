@@ -21,7 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "serial_cmd.h"
+#include "cmd_parser.h"
+#include "pan_tilt.h"
+#include "laser.h"
+#include "pir_sensor.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -31,7 +35,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define JETSON_UART  (&huart2)    /* Jetson 통신: USART2 = ST-LINK VCP (protocol.md 2장) */
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -54,7 +58,7 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
-
+static void handle_line(const char *line);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -94,7 +98,10 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
-
+  laser_off();
+  pan_tilt_init(&htim3);
+  pir_sensor_init();
+  serial_cmd_init(JETSON_UART);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,6 +111,20 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    /* 1) Jetson 명령 처리 */
+    char line[SERIAL_LINE_MAX];
+    SerialLineStatus status = serial_cmd_read_line(JETSON_UART, line);
+    if (status == SERIAL_LINE_OK) {
+      handle_line(line);
+    } else if (status == SERIAL_LINE_TOO_LONG) {
+      serial_cmd_send(JETSON_UART, "ERR:UNKNOWN");
+    }
+
+    /* 2) PIR 상태가 바뀌면 이벤트 전송 */
+    int motion;
+    if (pir_sensor_poll(&motion)) {
+      serial_cmd_send(JETSON_UART, motion ? "EVT@PIR:1" : "EVT@PIR:0");
+    }
   }
   /* USER CODE END 3 */
 }
@@ -300,7 +321,45 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+/* 받은 한 줄을 해석 → 실행 → OK / ERR 응답 */
+static void handle_line(const char *line)
+{
+  Command cmd = {0};
+  char reply[SERIAL_LINE_MAX];
+  ParseResult result = cmd_parse(line, &cmd);
 
+  if (result == PARSE_OK) {
+    switch (cmd.type) {
+      case CMD_PING:
+        break;
+      case CMD_AIM:
+        pan_tilt_set(cmd.pan, cmd.tilt);
+        break;
+      case CMD_LASER:
+        if (cmd.laser_on) {
+          laser_on();
+        } else {
+          laser_off();
+        }
+        break;
+      case CMD_HOME:
+        pan_tilt_home();
+        laser_off();
+        break;
+    }
+  }
+
+  cmd_make_reply(result, &cmd, reply, sizeof(reply));
+  serial_cmd_send(JETSON_UART, reply);
+}
+
+/* EXTI 인터럽트 콜백. PA10(PIR)과 PC13(B1)이 EXTI15_10을 같이 쓰므로 핀으로 구분 (pinmap.md 2-3) */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  if (GPIO_Pin == PIR_IN_Pin) {
+    pir_sensor_on_exti();
+  }
+}
 /* USER CODE END 4 */
 
 /**

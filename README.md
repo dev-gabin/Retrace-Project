@@ -227,7 +227,7 @@ Retrace-Project/
 │  │     ├─ cmd_parser.c               # 명령 해석 (PING · AIM · LASER · HOME)
 │  │     ├─ pan_tilt.c                 # Pan/Tilt 서보 PWM
 │  │     ├─ laser.c                    # 레이저 ON/OFF
-│  │     └─ pir_sensor.c               # PIR 감지 → EVT:PIR
+│  │     └─ pir_sensor.c               # PIR 감지 → EVT@PIR
 │  └─ drawer/                          # STM32 #2 서랍 (Jetson ↔ HC-06)
 │     ├─ drawer.ioc                    # CubeMX 핀·주변장치 설정
 │     └─ Core/Src/
