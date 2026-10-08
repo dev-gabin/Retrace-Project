@@ -12,6 +12,7 @@ add_executable(server_jetson
   server_main.c
   server/server.c
   server/db_handler.c
+  server/device_handler.c
   database/db_store.c
   database/jpeg_check.c
 )

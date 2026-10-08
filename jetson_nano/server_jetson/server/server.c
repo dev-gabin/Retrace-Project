@@ -2,6 +2,7 @@
 
 #include "server.h"
 #include "db_handler.h"
+#include "device_handler.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -294,6 +295,21 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
                                        &client->send_lock);
             if (rc < 0)
                 shutdown(client->fd, SHUT_RDWR);
+        } else if (strncmp(payload, "SET@", 4) == 0) {
+            char device_id[CLIENT_ID_SIZE];
+            char device_command[64];
+            char reason[32];
+            int result = device_handler_translate_set(
+                payload, device_id, sizeof(device_id), device_command,
+                sizeof(device_command), reason, sizeof(reason));
+            if (result == 1)
+                route_message(server, client, device_id, device_command);
+            else {
+                char error[64];
+                snprintf(error, sizeof(error), "ERROR@SET:%s",
+                         result == 0 ? "FORMAT" : reason);
+                (void)send_to_client(client, "SERVER", error);
+            }
         } else if (strncmp(payload, "EVT:", 4) == 0 ||
                    strncmp(payload, "OK:", 3) == 0 ||
                    strncmp(payload, "ERR:", 4) == 0) {
