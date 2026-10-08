@@ -2,8 +2,8 @@
 
 /* SG90 펄스 폭 (µs). TIM3는 1카운트 = 1µs (pinmap.md 1-3)
  * 확인 필요: 실물로 0도 · 180도 위치를 측정해서 조정 (pinmap.md 2-6) */
-#define SERVO_PULSE_MIN_US   1000   /* 0도 */
-#define SERVO_PULSE_MAX_US   2000   /* 180도 */
+#define SERVO_PULSE_MIN_US    700   /* 0도 */
+#define SERVO_PULSE_MAX_US   2300   /* 180도 */
 
 #define ANGLE_MAX     180
 #define PAN_CHANNEL   TIM_CHANNEL_1   /* PA6 SERVO_PAN */
