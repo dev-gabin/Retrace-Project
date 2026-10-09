@@ -78,14 +78,14 @@ class Stm32Link:
     def aim(self, pan: int, tilt: int) -> None:
         if not 0 <= pan <= 180 or not 0 <= tilt <= 180:
             raise ValueError("pan and tilt must be between 0 and 180")
-        self._command(f"AIM:{pan},{tilt}", "OK:AIM")
+        self._command(f"AIM:{pan},{tilt}", "OK@AIM")
 
     def laser(self, enabled: bool) -> None:
         state = "ON" if enabled else "OFF"
-        self._command(f"LASER:{state}", "OK:LASER")
+        self._command(f"LASER:{state}", "OK@LASER")
 
     def home(self) -> None:
-        self._command("HOME", "OK:HOME")
+        self._command("HOME", "OK@HOME")
 
     def point(
         self,
@@ -134,7 +134,7 @@ class Stm32Link:
                     continue
                 if response == expected:
                     return
-                if response.startswith("ERR:"):
+                if response.startswith("ERR@"):
                     raise Stm32LinkError(response)
                 raise Stm32LinkError(f"Unexpected STM32 response: {response}")
 

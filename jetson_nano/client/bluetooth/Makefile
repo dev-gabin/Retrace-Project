@@ -3,6 +3,7 @@ CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Wpedantic
 
 TARGET := client_bluetooth
 SOURCES := client_bluetooth.c ../common/tcp_client.c
+
 CPPFLAGS += -I../common
 LDLIBS += -lbluetooth
 

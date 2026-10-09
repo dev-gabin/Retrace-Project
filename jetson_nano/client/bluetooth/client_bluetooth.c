@@ -18,6 +18,8 @@
 
 #define TCP_LINE_MAX 8192
 #define BLUETOOTH_LINE_MAX 32
+#define SERVER_HOST "127.0.0.1"
+#define SERVER_PORT "5000"
 
 typedef struct {
     char data[TCP_LINE_MAX];
@@ -178,11 +180,10 @@ int main(int argc, char **argv)
     LineBuffer bluetooth_buffer = {0};
     LineBuffer socket_buffer = {0};
 
-    if (argc != 6 || password == NULL || *password == '\0') {
+    if (argc != 4 || password == NULL || *password == '\0') {
         fprintf(stderr,
                 "Usage: RETRACE_CLIENT_PASSWORD=<secret> %s "
-                "<server-ip-or-host> <port> <client-id> "
-                "<bluetooth-mac> <rfcomm-channel>\n",
+                "<client-id> <bluetooth-mac> <rfcomm-channel>\n",
                 argv[0]);
         return EXIT_FAILURE;
     }
@@ -190,21 +191,23 @@ int main(int argc, char **argv)
     signal(SIGTERM, on_signal);
 
     errno = 0;
-    channel = strtoul(argv[5], &channel_end, 10);
-    if (errno != 0 || channel_end == argv[5] || *channel_end != '\0' ||
+    channel = strtoul(argv[3], &channel_end, 10);
+    if (errno != 0 || channel_end == argv[3] || *channel_end != '\0' ||
         channel < 1 || channel > 30) {
         fprintf(stderr, "RFCOMM channel must be an integer from 1 to 30\n");
         goto fail;
     }
-    bluetooth_fd = connect_rfcomm(argv[4], channel);
+    bluetooth_fd = connect_rfcomm(argv[2], channel);
     if (bluetooth_fd < 0)
         goto fail;
-    socket_fd = tcp_client_connect(argv[1], argv[2], argv[3], password);
+    socket_fd = tcp_client_connect(SERVER_HOST, SERVER_PORT, argv[1], password);
     if (socket_fd < 0)
         goto fail;
 
-    fprintf(stderr, "Bluetooth SPP bridge ready: client=%s peer=%s channel=%lu\n",
-            argv[3], argv[4], channel);
+    fprintf(stderr,
+            "Bluetooth SPP bridge ready: server=%s:%s client=%s peer=%s "
+            "channel=%lu\n",
+            SERVER_HOST, SERVER_PORT, argv[1], argv[2], channel);
     while (!stopping) {
         struct pollfd descriptors[2] = {
             {.fd = socket_fd, .events = POLLIN},
