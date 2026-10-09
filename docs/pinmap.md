@@ -7,7 +7,7 @@
 |---|---|---|---|---|
 | **STM32 #1** (NUCLEO-F411RE) | 메인 유닛 (Pan/Tilt 서보, 레이저, PIR) | `stm32/main_unit` | USB Serial (VCP) | 펌웨어·빌드 완료 / 실물 확인 전 |
 | **STM32 #2** (NUCLEO-F411RE) | 서랍 노드 (서보 ×6, LED ×6, 비상 버튼) | `stm32/drawer` | Bluetooth (HC-06) | 펌웨어·빌드 완료 / 실물 확인 전 |
-| **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25 구현·빌드 완료 / 실물 확인 전 |
+| **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED ×4) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25/26/27/32 구현·빌드 완료 / 실물 확인 전 |
 | **ESP32 #2** (ESP32-C3 Super Mini) | 부저 태그 (부저) | `esp32/buzzer_tag` | BLE | GPIO3 구현·빌드 완료 / 실물 확인 전 |
 
 ---
@@ -416,10 +416,13 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 | 부품 | 핀 | 설정 | 코드 상수 |
 |---|---|---|---|
 | PIR 출력 | **GPIO34** | `INPUT` | `PIR_PIN` |
-| 현관등 LED | **GPIO25** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PIN` |
+| 현관등 LED 1 | **GPIO25** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[0]` |
+| 현관등 LED 2 | **GPIO26** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[1]` |
+| 현관등 LED 3 | **GPIO27** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[2]` |
+| 현관등 LED 4 | **GPIO32** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[3]` |
 
 - **PIR → GPIO34**: 입력 전용 핀이라 센서 입력에 적합. 내부 풀다운이 없으므로 센서가 빠졌을 때 오작동이 걱정되면 **외부 10kΩ 풀다운** 추가
-- **현관등 LED**: 한 색 LED, GPIO25로 구현. 전류 제한 저항 필요. 실제 LED 종류·구동 회로는 강의실에서 확인.
+- **현관등 LED ×4**: GPIO25/26/27/32로 동시에 제어. LED마다 220~330Ω 전류 제한 저항을 하나씩 직렬 연결.
 
 - PIR 50ms 필터, 움직임 종료 후 10초 점등 유지. `ALERT`는 250ms마다 ON/OFF하며 10초 후 기본 센서등 모드로 복귀 (시간은 코드 맨 위 임시 상수).
 - Wi-Fi·MQTT가 없어도 기본 센서등 동작. 실제 업로드·PIR·LED·네트워크 검증은 강의실에서 진행.
@@ -439,7 +442,7 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 - [x] PIR 센서등·시간 유지·NORMAL/ALERT·Wi-Fi/MQTT·재연결 구현
 - [x] 기본·네트워크 활성화 빌드 성공·경고 0개
 - [ ] 개인 `network_config.h`에 Wi-Fi·Jetson IP 입력 후 실제 보드용 `lolin_d32` 재빌드·업로드
-- [ ] PIR·LED 구동, 실제 MQTT 발행·구독·연결 유실 검증
+- [ ] PIR·LED ×4 구동, 실제 MQTT 발행·구독·연결 유실 검증
 
 ---
 
