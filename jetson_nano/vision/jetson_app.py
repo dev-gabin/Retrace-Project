@@ -52,10 +52,18 @@ def main() -> None:
         stm32.close()
         return
 
+    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
+    camera.set(cv2.CAP_PROP_FPS, 30)
     camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+    # 카메라 자동 노출 안정화 및 초기 불완전 프레임 제거
+    time.sleep(1.0)
+    for _ in range(30):
+        camera.read()
+
+    
 
     state = "IDLE"
     pir_high = False

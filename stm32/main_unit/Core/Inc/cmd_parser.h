@@ -15,8 +15,8 @@ typedef enum {
 
 typedef enum {
   PARSE_OK,         /* 올바른 명령 */
-  PARSE_UNKNOWN,    /* 모르는 명령 · 형식 오류 → ERR:UNKNOWN */
-  PARSE_RANGE       /* 형식은 맞지만 값이 범위 밖 → ERR:AIM:RANGE */
+  PARSE_UNKNOWN,    /* 모르는 명령 · 형식 오류 → ERR@UNKNOWN */
+  PARSE_RANGE       /* 형식은 맞지만 값이 범위 밖 → ERR@AIM:RANGE */
 } ParseResult;
 
 typedef struct {
@@ -29,7 +29,7 @@ typedef struct {
 /* line: '\n'을 뺀 한 줄 (예: "AIM:90,45") */
 ParseResult cmd_parse(const char *line, Command *cmd);
 
-/* 파싱 결과로 응답 문자열 생성 (예: "OK:AIM", "ERR:AIM:RANGE", "ERR:UNKNOWN") */
+/* 파싱 결과로 응답 문자열 생성 (예: "OK@AIM", "ERR@AIM:RANGE", "ERR@UNKNOWN") */
 void cmd_make_reply(ParseResult result, const Command *cmd, char *out, size_t out_size);
 
 #endif /* CMD_PARSER_H */

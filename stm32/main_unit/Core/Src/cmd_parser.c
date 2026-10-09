@@ -96,13 +96,13 @@ void cmd_make_reply(ParseResult result, const Command *cmd, char *out, size_t ou
       if (cmd->type == CMD_PING)
         snprintf(out, out_size, "OK@PING");
       else
-        snprintf(out, out_size, "OK:%s", cmd_name(cmd->type));
+        snprintf(out, out_size, "OK@%s", cmd_name(cmd->type));
       break;
     case PARSE_RANGE:
-      snprintf(out, out_size, "ERR:%s:RANGE", cmd_name(cmd->type));
+      snprintf(out, out_size, "ERR@%s:RANGE", cmd_name(cmd->type));
       break;
     default:
-      snprintf(out, out_size, "ERR:UNKNOWN");
+      snprintf(out, out_size, "ERR@UNKNOWN");
       break;
   }
 }
