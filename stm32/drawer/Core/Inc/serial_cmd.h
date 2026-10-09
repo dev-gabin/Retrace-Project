@@ -11,7 +11,7 @@
 typedef enum {
   SERIAL_NO_LINE = 0,     /* 아직 완성된 줄 없음 */
   SERIAL_LINE_OK,         /* 한 줄 받음 */
-  SERIAL_LINE_TOO_LONG    /* 긴 줄 · 비정상 문자 · 수신 오류 · 큐 초과 → ERR:UNKNOWN */
+  SERIAL_LINE_TOO_LONG    /* 긴 줄 · 비정상 문자 · 수신 오류 · 큐 초과 → ERR@UNKNOWN */
 } SerialLineStatus;
 
 /* UART를 등록하고 인터럽트 수신 시작 */

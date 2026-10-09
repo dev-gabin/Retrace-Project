@@ -71,7 +71,7 @@ static void process_port(UART_HandleTypeDef *uart)
   char line[SERIAL_LINE_MAX], reply[SERIAL_LINE_MAX];
   SerialLineStatus status = serial_cmd_read_line(uart, line);
   if (status == SERIAL_LINE_TOO_LONG) {
-    serial_cmd_send(uart, "ERR:UNKNOWN");
+    serial_cmd_send(uart, "ERR@UNKNOWN");
   } else if (status == SERIAL_LINE_OK) {
     Command cmd = {0};
     ParseResult result = cmd_parse(line, &cmd);
@@ -79,11 +79,11 @@ static void process_port(UART_HandleTypeDef *uart)
       switch (cmd.type) {
         case CMD_DRAWER:
           if (drawer_reply_uart != NULL) {
-            serial_cmd_send(uart, "ERR:DRAWER:BUSY");
+            serial_cmd_send(uart, "ERR@DRAWER:BUSY");
           } else if (!drawer_i2c_check()) {
-            serial_cmd_send(uart, "ERR:DRAWER:I2C");
+            serial_cmd_send(uart, "ERR@DRAWER:I2C");
           } else if (!drawer_open(cmd.drawer)) {
-            serial_cmd_send(uart, "ERR:DRAWER:BUSY");
+            serial_cmd_send(uart, "ERR@DRAWER:BUSY");
           } else {
             drawer_reply_uart = uart;
           }
@@ -92,7 +92,7 @@ static void process_port(UART_HandleTypeDef *uart)
         case CMD_LED_ALL_OFF: drawer_led_all_off(); break;
         case CMD_I2C_CHECK:
           serial_cmd_send(uart, drawer_i2c_check() ?
-                          "OK:I2C:PCA9685" : "ERR:I2C:PCA9685");
+                          "OK@I2C:PCA9685" : "ERR@I2C:PCA9685");
           return;
         case CMD_PING: break;
       }
@@ -153,7 +153,7 @@ int main(void)
     if (drawer_event != DRAWER_EVENT_NONE && drawer_reply_uart != NULL) {
       serial_cmd_send(drawer_reply_uart,
                       drawer_event == DRAWER_EVENT_COMPLETE ?
-                      "OK:DRAWER" : "ERR:DRAWER:I2C");
+                      "OK@DRAWER" : "ERR@DRAWER:I2C");
       drawer_reply_uart = NULL;
     }
     process_port(&huart1);
