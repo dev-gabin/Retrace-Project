@@ -16,7 +16,7 @@
 // 메시지 형식: docs/protocol.md 4장 (MQTT)
 // 실물에서 조정할 값. HIGH로 켜지는 한 색 LED/구동 회로 기준이다.
 static constexpr uint8_t PIR_PIN = 34;
-static constexpr uint8_t LIGHT_PIN = 25;
+static constexpr uint8_t LIGHT_PINS[] = {25, 26, 27, 32};
 static constexpr uint32_t LIGHT_HOLD_MS = 7000;
 static constexpr uint32_t ALERT_HOLD_MS = 10000;
 static constexpr uint32_t ALERT_BLINK_MS = 250;
@@ -28,6 +28,13 @@ static constexpr char MQTT_CLIENT_ID[] = "retrace-entrance";
 static constexpr char MOTION_TOPIC[] = "retrace/entrance/motion";
 static constexpr char LIGHT_TOPIC[] = "retrace/entrance/light";
 static constexpr char STATUS_TOPIC[] = "retrace/entrance/status";
+
+static void set_lights(bool on) {
+    const uint8_t level = on ? HIGH : LOW;
+    for (const uint8_t pin : LIGHT_PINS) {
+        digitalWrite(pin, level);
+    }
+}
 
 static EntranceControl light(LIGHT_HOLD_MS, ALERT_HOLD_MS, ALERT_BLINK_MS, PIR_DEBOUNCE_MS);
 static QueueHandle_t command_queue = nullptr;
@@ -140,8 +147,10 @@ static void network_task(void*) {
 }
 
 void setup() {
-    digitalWrite(LIGHT_PIN, LOW);
-    pinMode(LIGHT_PIN, OUTPUT);
+    for (const uint8_t pin : LIGHT_PINS) {
+        digitalWrite(pin, LOW);
+        pinMode(pin, OUTPUT);
+    }
     pinMode(PIR_PIN, INPUT); // GPIO34는 내부 pull-up/down이 없다.
     Serial.begin(115200);
     Serial.println("entrance_node start");
@@ -164,7 +173,7 @@ void loop() {
     }
     const uint32_t now = millis();
     const bool motion = light.sample(digitalRead(PIR_PIN) == HIGH, now);
-    digitalWrite(LIGHT_PIN, light.light_on(now) ? HIGH : LOW);
+    set_lights(light.light_on(now));
     if (motion) {
         Serial.println("PIR motion");
         if (mqtt_ready.load() && motion_queue != nullptr && xQueueSend(motion_queue, &now, 0) != pdTRUE) {
