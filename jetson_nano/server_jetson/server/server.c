@@ -87,6 +87,8 @@ static int send_to_client(ClientInfo *client, const char *sender,
     int length = snprintf(line, sizeof(line), "[%s]%s\n", sender, payload);
     if (length < 0 || (size_t)length >= sizeof(line))
         return -1;
+    if (strncmp(payload, "ERR@", 4) == 0)
+        fprintf(stderr, "[SERVER][ERR][to:%s] %s\n", client->id, payload);
     return send_client_line(client, line);
 }
 
@@ -463,10 +465,11 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
             }
         } else if (strncmp(payload, "EVT@", 4) == 0) {
             printf("[%s] %s\n", client->id, payload);
-        } else if (strncmp(payload, "EVT:", 4) == 0 ||
-                   strncmp(payload, "OK:", 3) == 0 ||
-                   strncmp(payload, "ERR:", 4) == 0) {
-            printf("[%s] %s\n", client->id, payload);
+        } else if (strncmp(payload, "OK@", 3) == 0) {
+            printf("[SERVER][OK][from:%s] %s\n", client->id, payload);
+        } else if (strncmp(payload, "ERR@", 4) == 0) {
+            fprintf(stderr, "[SERVER][ERR][from:%s] %s\n", client->id,
+                    payload);
         } else {
             (void)send_to_client(client, "SERVER", "ERR@COMMAND:UNKNOWN");
         }

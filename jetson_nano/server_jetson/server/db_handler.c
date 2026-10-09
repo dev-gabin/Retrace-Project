@@ -120,7 +120,8 @@ static int send_error(RtStore *store, int fd, const char *requester,
                       const char *detail)
 {
     (void)store;
-    fprintf(stderr, "[%s] %s: %s\n", requester, command, detail);
+    fprintf(stderr, "[SERVER][ERR][db][client:%s] %s: %s\n", requester,
+            command, detail);
     return reply(lock, fd, requester, "ERR@%s:%s\n", command, detail);
 }
 

@@ -40,12 +40,10 @@ int device_handler_translate_set(const char *payload,
         return invalid(reason, reason_capacity, "FORMAT");
     action = first_colon + 1;
     second_colon = strchr(action, ':');
-    if (second_colon == NULL || strchr(second_colon + 1, ':') != NULL)
-        return invalid(reason, reason_capacity, "FORMAT");
-    number = second_colon + 1;
-
     target_length = (size_t)(first_colon - target);
-    action_length = (size_t)(second_colon - action);
+    action_length = second_colon != NULL
+                        ? (size_t)(second_colon - action)
+                        : strlen(action);
     if (target_length == 0 || target_length >= device_id_capacity)
         return invalid(reason, reason_capacity, "TARGET");
     for (i = 0; i < target_length; ++i) {
@@ -55,6 +53,25 @@ int device_handler_translate_set(const char *payload,
               (ch >= '0' && ch <= '9') || ch == '_' || ch == '-'))
             return invalid(reason, reason_capacity, "TARGET");
     }
+
+    /* BUZZER is a no-argument command. Preserve the target in the forwarded
+       payload so the receiving client gets "clientID:BUZZER". */
+    if (second_colon == NULL && action_length == sizeof("BUZZER") - 1 &&
+        memcmp(action, "BUZZER", action_length) == 0) {
+        memcpy(device_id, target, target_length);
+        device_id[target_length] = '\0';
+        int command_length = snprintf(device_command, device_command_capacity,
+                                      "%.*s:BUZZER", (int)target_length,
+                                      target);
+        if (command_length < 0 ||
+            (size_t)command_length >= device_command_capacity)
+            return invalid(reason, reason_capacity, "INTERNAL");
+        return 1;
+    }
+
+    if (second_colon == NULL || strchr(second_colon + 1, ':') != NULL)
+        return invalid(reason, reason_capacity, "FORMAT");
+    number = second_colon + 1;
     if (action_length != sizeof("OPEN") - 1 ||
         memcmp(action, "OPEN", action_length) != 0)
         return invalid(reason, reason_capacity, "ACTION");
