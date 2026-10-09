@@ -117,7 +117,7 @@ int main(void)
     if (status == SERIAL_LINE_OK) {
       handle_line(line);
     } else if (status == SERIAL_LINE_TOO_LONG) {
-      serial_cmd_send(JETSON_UART, "ERR:UNKNOWN");
+      serial_cmd_send(JETSON_UART, "ERR@UNKNOWN");
     }
 
     /* 2) PIR 상태가 바뀌면 이벤트 전송 */
