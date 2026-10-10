@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createApi, validateItem, ApiError } from '../api.js';
 
-const record = () => ({ item: 'carkey', pos_x: 412, pos_y: 288, seen_at: '2026-10-03T14:22:05+09:00', snapshot: 'snapshots/key.jpg', drawer_id: null, state: 'visible' });
+const record = (item = 'carkey') => ({ item, pos_x: 412, pos_y: 288, seen_at: '2026-10-03T14:22:05+09:00', snapshot: 'snapshots/key.jpg', drawer_id: null, state: 'visible' });
 const reply = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => structuredClone(data) });
 const hasCode = code => error => error instanceof ApiError && error.code === code;
 function liveWith(data, status = 200) {
@@ -36,6 +36,19 @@ test('실제 모드는 문서의 모든 경로·메서드·본문을 사용한�
     assert.ok(call.signal instanceof AbortSignal);
     assert.equal(call.headers['Content-Type'], call.method === 'POST' ? 'application/json' : undefined);
   }
+});
+
+test('서버가 반환한 동적 물건 ID를 조회하고 안내할 수 있다', async () => {
+  const keyboard = record('keyboard');
+  const { api, calls } = liveWith(url => url.endsWith('/api/items') ? { items: [keyboard] } : url.endsWith('/api/items/keyboard') ? keyboard : { ok: true });
+  assert.deepEqual(await api.listItems(), [keyboard]);
+  assert.deepEqual(await api.getItem('keyboard'), keyboard);
+  await api.aim('keyboard');
+  assert.deepEqual(calls.map(call => call.url), [
+    'http://jetson.local:8080/api/items',
+    'http://jetson.local:8080/api/items/keyboard',
+    'http://jetson.local:8080/api/items/keyboard/aim',
+  ]);
 });
 
 test('샘플 모드는 모든 조회·제어에서 네트워크를 사용하지 않고 기록 복사본을 준다', async () => {
@@ -73,7 +86,7 @@ test('기록 없음·서랍 기록·UTC 시각·사진 없는 기록을 허용�
 
 const malformed = [
   ['없는 필드', { item: 'carkey' }],
-  ['모르는 물건', { ...record(), item: 'unknown_item' }],
+  ['대문자 물건 ID', { ...record(), item: 'UNKNOWN_ITEM' }],
   ['음수 좌표', { ...record(), pos_x: -1 }],
   ['한쪽만 없는 좌표', { ...record(), pos_x: null }],
   ['소수 좌표', { ...record(), pos_y: 1.2 }],

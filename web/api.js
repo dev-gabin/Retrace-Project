@@ -1,6 +1,6 @@
 import { createDemoTransport } from './demo-data.js';
 
-export const ITEM_IDS = Object.freeze(['carkey', 'airpods', 'wallet']);
+const itemIdPattern = /^[a-z][a-z0-9_]{0,31}$/;
 const states = ['visible', 'occluded', 'uncertain'];
 
 export class ApiError extends Error {
@@ -13,7 +13,9 @@ export class ApiError extends Error {
 }
 
 function validItemId(item) {
-  if (!ITEM_IDS.includes(item)) throw new ApiError('INVALID_ITEM', '지원하는 물건을 선택해 주세요.');
+  if (typeof item !== 'string' || !itemIdPattern.test(item)) {
+    throw new ApiError('INVALID_ITEM', '물건 ID 형식을 확인해 주세요.');
+  }
   return item;
 }
 
@@ -25,7 +27,7 @@ function snapshotPath(path) {
 
 export function validateItem(record) {
   const bad = () => { throw new ApiError('BAD_RESPONSE', '서버의 물건 기록 형식이 프로토콜과 다릅니다.'); };
-  if (!record || typeof record !== 'object' || Array.isArray(record) || !ITEM_IDS.includes(record.item)) bad();
+  if (!record || typeof record !== 'object' || Array.isArray(record) || typeof record.item !== 'string' || !itemIdPattern.test(record.item)) bad();
   const xyEmpty = record.pos_x === null && record.pos_y === null;
   const xyValid = Number.isInteger(record.pos_x) && record.pos_x >= 0 && Number.isInteger(record.pos_y) && record.pos_y >= 0;
   if (!xyEmpty && !xyValid) bad();

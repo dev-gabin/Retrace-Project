@@ -3,13 +3,25 @@ import { createApi, ApiError } from './api.js';
 
 const api = createApi(config);
 const isDemo = api.mode === 'demo';
-const labels = { carkey: '차키', airpods: '에어팟', wallet: '지갑' };
-const icons = { carkey: 'key', airpods: 'airpods', wallet: 'wallet' };
-const descriptions = { carkey: '외출할 때 함께', airpods: '나만의 작은 음악', wallet: '외출할 때 챙기는 지갑' };
+const labels = { car_key: '차키', carkey: '차키', airpods: '에어팟', earphones: '이어폰', wallet: '지갑' };
+const icons = { car_key: 'key', carkey: 'key', airpods: 'airpods', earphones: 'airpods', wallet: 'wallet' };
+const descriptions = { car_key: '외출할 때 함께', carkey: '외출할 때 함께', airpods: '나만의 작은 음악', earphones: '나만의 작은 음악', wallet: '외출할 때 챙기는 지갑' };
 const stateLabels = { visible: '마지막 화면에서 확인', occluded: '가려진 상태로 기록', uncertain: '위치 확인 필요' };
 const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [] };
 const $ = id => document.getElementById(id);
 let toastTimer;
+
+function itemLabel(item) {
+  return labels[item] ?? item.replaceAll('_', ' ');
+}
+
+function itemIcon(item) {
+  return icons[item] ?? 'image';
+}
+
+function itemDescription(item) {
+  return descriptions[item] ?? '마지막으로 확인된 물건';
+}
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -52,7 +64,7 @@ function showError(message = '') {
 function renderItems() {
   const focusedItem = $('item-list').contains(document.activeElement) ? document.activeElement.dataset.item : null;
   const query = $('search-input').value.trim().toLocaleLowerCase('ko-KR');
-  const matches = state.items.filter(record => labels[record.item].includes(query) || record.item.includes(query));
+  const matches = state.items.filter(record => itemLabel(record.item).toLocaleLowerCase('ko-KR').includes(query) || record.item.includes(query));
   $('item-count').textContent = state.items.length;
   const fragment = document.createDocumentFragment();
   for (const record of matches) {
@@ -61,12 +73,12 @@ function renderItems() {
     button.className = `item-card${record.item === state.selected ? ' is-selected' : ''}`;
     button.dataset.item = record.item;
     button.setAttribute('aria-pressed', String(record.item === state.selected));
-    button.setAttribute('aria-label', `${labels[record.item]} 상세 보기`);
+    button.setAttribute('aria-label', `${itemLabel(record.item)} 상세 보기`);
     const holder = document.createElement('span');
     holder.className = 'item-icon';
-    holder.append(icon(icons[record.item]));
+    holder.append(icon(itemIcon(record.item)));
     button.append(holder);
-    for (const [className, text] of [['item-name', labels[record.item]], ['item-description', descriptions[record.item]], ['item-time', relativeTime(record.seen_at)]]) {
+    for (const [className, text] of [['item-name', itemLabel(record.item)], ['item-description', itemDescription(record.item)], ['item-time', relativeTime(record.seen_at)]]) {
       const span = document.createElement('span');
       span.className = className;
       span.textContent = text;
@@ -102,7 +114,7 @@ function renderDetail() {
   $('detail-card').setAttribute('aria-busy', String(state.detailLoading));
   if (!record) {
     clearPhoto(state.detailLoading ? '마지막 기록을 불러오는 중이에요' : '표시할 기록이 없어요');
-    $('selected-name').textContent = state.selected ? labels[state.selected] : '물건을 선택해 주세요';
+    $('selected-name').textContent = state.selected ? itemLabel(state.selected) : '물건을 선택해 주세요';
     $('selected-location').textContent = '마지막 기록을 확인할 수 있어요.';
     $('seen-at').textContent = '—';
     $('record-location').textContent = '—';
@@ -114,7 +126,7 @@ function renderDetail() {
     updateButtons();
     return;
   }
-  $('selected-name').textContent = labels[record.item];
+  $('selected-name').textContent = itemLabel(record.item);
   $('selected-location').textContent = locationText(record);
   $('relative-time').textContent = relativeTime(record.seen_at);
   $('seen-at').textContent = record.seen_at ? new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }).format(new Date(record.seen_at)) : '기록 없음';
@@ -127,7 +139,7 @@ function renderDetail() {
   const src = api.snapshotUrl(record);
   if (src) {
     $('photo-empty').hidden = true;
-    $('snapshot-image').alt = `${labels[record.item]}의 ${isDemo ? '샘플' : '마지막 목격'} 장면`;
+    $('snapshot-image').alt = `${itemLabel(record.item)}의 ${isDemo ? '샘플' : '마지막 목격'} 장면`;
     $('snapshot-image').src = src;
     $('snapshot-image').hidden = false;
     $('scene-label').textContent = isDemo ? '샘플 장면 · 실제 촬영 사진 아님' : '마지막 목격 사진';
@@ -137,7 +149,7 @@ function renderDetail() {
     if (isDemo && record.pos_x !== null) {
       $('scene-target').style.left = `${Math.min(92, Math.max(8, record.pos_x / 640 * 100))}%`;
       $('scene-target').style.top = `${Math.min(92, Math.max(20, record.pos_y / 340 * 100))}%`;
-      $('target-label').textContent = labels[record.item];
+      $('target-label').textContent = itemLabel(record.item);
     }
   } else { clearPhoto('저장된 사진이 없어요'); }
   updateButtons();
@@ -236,7 +248,7 @@ $('refresh-button').addEventListener('click', refreshItems);
 $('aim-button').addEventListener('click', () => {
   if ($('aim-button').disabled || !state.record) return;
   const item = state.record.item;
-  command('aim', 'target', `${labels[item]} 레이저 안내`, () => api.aim(item));
+  command('aim', 'target', `${itemLabel(item)} 레이저 안내`, () => api.aim(item));
 });
 document.querySelectorAll('[data-drawer]').forEach(button => button.addEventListener('click', () => selectDrawer(Number(button.dataset.drawer))));
 $('drawer-open-button').addEventListener('click', () => {
