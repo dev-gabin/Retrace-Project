@@ -1,8 +1,7 @@
-# YOLO inference
-ultralytics==8.3.0
-
-# Camera / image processing / bounding box display
-opencv-python==5.0.0.93
-
-# STM32 main-unit USB serial link
+# Install with: python -m pip install --no-deps -r jetson_nano/requirements.txt
+# Use a venv created with --system-site-packages.
+# Keep the JetPack-provided CUDA PyTorch and the working OpenCV installation.
+ultralytics==8.4.107
+typing_extensions==4.13.2
+filelock==3.16.1
 pyserial==3.5
