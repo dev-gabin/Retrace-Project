@@ -54,15 +54,27 @@ int device_handler_translate_set(const char *payload,
             return invalid(reason, reason_capacity, "TARGET");
     }
 
-    /* BUZZER is a no-argument command. Preserve the target in the forwarded
-       payload so the receiving client gets "clientID:BUZZER". */
-    if (second_colon == NULL && action_length == sizeof("BUZZER") - 1 &&
+    /* Keep the legacy no-argument BUZZER command, and also accept an explicit
+       1/0 state so the web UI can start or stop the tag. */
+    if (action_length == sizeof("BUZZER") - 1 &&
         memcmp(action, "BUZZER", action_length) == 0) {
+        const char *state = second_colon != NULL ? second_colon + 1 : NULL;
+        if (state != NULL &&
+            (state[0] == '\0' || state[1] != '\0' ||
+             (state[0] != '0' && state[0] != '1')))
+            return invalid(reason, reason_capacity, "FORMAT");
         memcpy(device_id, target, target_length);
         device_id[target_length] = '\0';
-        int command_length = snprintf(device_command, device_command_capacity,
-                                      "%.*s:BUZZER", (int)target_length,
-                                      target);
+        int command_length = state == NULL
+                                 ? snprintf(device_command,
+                                            device_command_capacity,
+                                            "%.*s:BUZZER",
+                                            (int)target_length, target)
+                                 : snprintf(device_command,
+                                            device_command_capacity,
+                                            "%.*s:BUZZER:%c",
+                                            (int)target_length, target,
+                                            state[0]);
         if (command_length < 0 ||
             (size_t)command_length >= device_command_capacity)
             return invalid(reason, reason_capacity, "INTERNAL");

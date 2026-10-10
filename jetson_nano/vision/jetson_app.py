@@ -6,11 +6,14 @@ import cv2
 
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenStore
+from vision.aim_mapper import AimMapper
 from vision.detector import YoloDetector
+from vision.http_api import RetraceHttpServer
 from vision.object_tracker import StableObjectTracker
 
 
 JETSON_DIR = Path(__file__).resolve().parents[1]
+REPOSITORY_DIR = JETSON_DIR.parent
 MODEL_PATH = JETSON_DIR / "models" / "yolo" / "coco83_yolo26n_v6_demo_desk.pt"
 
 CAMERA_INDEX = 0
@@ -32,6 +35,7 @@ def main() -> None:
 
     storage = None
     stm32 = None
+    http_server = None
     try:
         storage = LastSeenStore.from_env()
         stm32 = Stm32Link()
@@ -50,6 +54,7 @@ def main() -> None:
         print(f"[ERROR] 카메라 {CAMERA_INDEX}번을 열 수 없음")
         print("USB 웹캠 연결과 CAMERA_INDEX를 확인하세요.")
         stm32.close()
+        storage.close()
         return
 
     # camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
@@ -60,17 +65,37 @@ def main() -> None:
 
     # 카메라 자동 노출 안정화 및 초기 불완전 프레임 제거
     time.sleep(1.0)
+    warmup_frame = None
     for _ in range(30):
-        camera.read()
+        ok, candidate = camera.read()
+        if ok:
+            warmup_frame = candidate
+    if warmup_frame is None:
+        print("[ERROR] 카메라 초기 프레임을 읽지 못함")
+        camera.release()
+        stm32.close()
+        storage.close()
+        return
 
-    
+    frame_height, frame_width = warmup_frame.shape[:2]
+    try:
+        mapper = AimMapper.from_env(frame_width, frame_height)
+        http_server = RetraceHttpServer.from_env(
+            storage,
+            stm32,
+            mapper,
+            REPOSITORY_DIR / "web",
+        )
+        http_server.start()
+    except (OSError, ValueError) as error:
+        print(f"[ERROR] HTTP API 시작 실패: {error}")
+        camera.release()
+        stm32.close()
+        storage.close()
+        return
 
-    # 카메라 자동 노출 안정화 및 초기 불완전 프레임 제거
-    time.sleep(1.0)
-    for _ in range(30):
-        camera.read()
-
-    
+    http_host, http_port = http_server.address
+    print(f"[HTTP] http://{http_host}:{http_port}")
 
     state = "IDLE"
     pir_high = False
@@ -189,6 +214,8 @@ def main() -> None:
         print("\n[STOP] Ctrl+C 종료")
     finally:
         camera.release()
+        if http_server is not None:
+            http_server.close()
         try:
             stm32.laser(False)
         except Stm32LinkError:

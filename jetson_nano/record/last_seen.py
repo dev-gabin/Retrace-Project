@@ -10,12 +10,14 @@ import re
 import socket
 import threading
 from typing import Any
+from urllib.parse import unquote
 from uuid import uuid4
 
 import cv2
 
 
 _ITEM_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+_CLIENT_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,31}$")
 _VALID_STATES = {"visible", "occluded", "uncertain"}
 _MAX_LINE_SIZE = 4096
 
@@ -32,6 +34,17 @@ class SavedObservation:
     y: int
     seen_at: str
     drawer_id: int
+    state: str
+
+
+@dataclass(frozen=True)
+class LastSeenRecord:
+    item: str
+    pos_x: int | None
+    pos_y: int | None
+    seen_at: str | None
+    snapshot: str | None
+    drawer_id: int | None
     state: str
 
 
@@ -135,11 +148,54 @@ class LastSeenStore:
         except ValueError as error:
             raise LastSeenError(f"Invalid coordinates from server: {response}") from error
 
+    def list_items(self) -> list[LastSeenRecord]:
+        with self._connection_lock:
+            try:
+                connection = self._connect()
+                connection.sendall(b"[SQL]LIST\n")
+                records: list[LastSeenRecord] = []
+                while True:
+                    sender, response = self._read_message(connection)
+                    if sender != "SQL":
+                        raise LastSeenError(
+                            f"Unexpected server response: [{sender}]{response}"
+                        )
+                    if response.startswith("LIST_ITEM@"):
+                        records.append(self._parse_record(response, "LIST_ITEM"))
+                        continue
+                    if response == f"LIST_END@{len(records)}":
+                        return records
+                    if response.startswith("ERR@"):
+                        raise LastSeenError(response)
+                    raise LastSeenError(f"Unexpected LIST response: {response}")
+            except LastSeenError:
+                self._disconnect()
+                raise
+            except (OSError, UnicodeError) as error:
+                self._disconnect()
+                raise LastSeenError(
+                    f"Storage server connection failed: {error}"
+                ) from error
+
+    def get_item(self, item: str) -> LastSeenRecord:
+        if _ITEM_PATTERN.fullmatch(item) is None:
+            raise LastSeenError("Invalid item ID")
+        return self._parse_record(self._request(f"GET@{item}"), "GET")
+
+    def send_device_command(self, target: str, action: str) -> None:
+        if _CLIENT_ID_PATTERN.fullmatch(target) is None:
+            raise LastSeenError("Invalid device ID")
+        if not action or any(character in action for character in "[]\r\n"):
+            raise LastSeenError("Invalid device command")
+        response = self._request(
+            f"SET@{target}:{action}", target="SERVER", expected_sender="SERVER"
+        )
+        if response != f"OK@SET:{target}":
+            raise LastSeenError(response)
+
     def close(self) -> None:
         with self._connection_lock:
-            if self._connection is not None:
-                self._connection.close()
-                self._connection = None
+            self._disconnect()
 
     @staticmethod
     def _validate(
@@ -193,27 +249,29 @@ class LastSeenStore:
 
         return f"snapshots/{final_path.name}", final_path
 
-    def _request(self, command: str) -> str:
+    def _request(
+        self,
+        command: str,
+        *,
+        target: str = "SQL",
+        expected_sender: str = "SQL",
+    ) -> str:
         self._validate_credential(self.client_id, "client ID")
         self._validate_credential(self.password, "password")
 
         with self._connection_lock:
             try:
                 connection = self._connect()
-                connection.sendall(f"[SQL]{command}\n".encode("ascii"))
+                connection.sendall(f"[{target}]{command}\n".encode("ascii"))
                 sender, response = self._read_message(connection)
-                if sender != "SQL":
+                if sender != expected_sender:
                     raise LastSeenError(f"Unexpected server response: [{sender}]{response}")
                 return response
             except LastSeenError:
-                if self._connection is not None:
-                    self._connection.close()
-                    self._connection = None
+                self._disconnect()
                 raise
             except (OSError, UnicodeError) as error:
-                if self._connection is not None:
-                    self._connection.close()
-                    self._connection = None
+                self._disconnect()
                 raise LastSeenError(f"Storage server connection failed: {error}") from error
 
     def _connect(self) -> socket.socket:
@@ -231,6 +289,52 @@ class LastSeenStore:
             raise LastSeenError(f"Server login failed: [{sender}]{response}")
         self._connection = connection
         return connection
+
+    def _disconnect(self) -> None:
+        if self._connection is not None:
+            self._connection.close()
+            self._connection = None
+
+    @staticmethod
+    def _parse_record(response: str, kind: str) -> LastSeenRecord:
+        prefix = f"{kind}@"
+        if not response.startswith(prefix):
+            raise LastSeenError(response)
+        fields = response[len(prefix):].split(":")
+        if len(fields) != 8:
+            raise LastSeenError(f"Malformed {kind} record: {response}")
+        item, state, observed, raw_x, raw_y, raw_time, raw_snapshot, raw_drawer = fields
+        if _ITEM_PATTERN.fullmatch(item) is None or state not in _VALID_STATES:
+            raise LastSeenError(f"Malformed {kind} record: {response}")
+        if observed not in {"0", "1"}:
+            raise LastSeenError(f"Malformed {kind} record: {response}")
+        try:
+            pos_x = None if raw_x == "-" else int(raw_x)
+            pos_y = None if raw_y == "-" else int(raw_y)
+            drawer_value = int(raw_drawer)
+        except ValueError as error:
+            raise LastSeenError(f"Malformed {kind} record: {response}") from error
+        if (pos_x is None) != (pos_y is None) or drawer_value not in range(7):
+            raise LastSeenError(f"Malformed {kind} record: {response}")
+        if observed == "0":
+            pos_x = None
+            pos_y = None
+            seen_at = None
+            snapshot = None
+            drawer_id = None
+        else:
+            seen_at = None if raw_time == "-" else unquote(raw_time)
+            snapshot = None if raw_snapshot == "-" else raw_snapshot
+            drawer_id = drawer_value or None
+        return LastSeenRecord(
+            item=item,
+            pos_x=pos_x,
+            pos_y=pos_y,
+            seen_at=seen_at,
+            snapshot=snapshot,
+            drawer_id=drawer_id,
+            state=state,
+        )
 
     @staticmethod
     def _validate_credential(value: str, label: str) -> None:

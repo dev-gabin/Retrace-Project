@@ -11,6 +11,9 @@ constexpr uint8_t BUZZER_PIN = 3;
 constexpr uint32_t BUZZER_FREQUENCY = 2500;
 constexpr uint8_t PWM_RESOLUTION = 8;
 constexpr uint8_t PWM_DUTY = 128;
+#if ESP_ARDUINO_VERSION_MAJOR < 3
+constexpr uint8_t BUZZER_PWM_CHANNEL = 0;
+#endif
 constexpr uint32_t BUZZER_ON_MS = 1000;
 constexpr uint32_t BUZZER_OFF_MS = 300;
 constexpr uint8_t BUZZER_REPEAT_COUNT = 5;
@@ -21,8 +24,10 @@ constexpr char CHARACTERISTIC_UUID[] =
     "36b342d0-153b-418e-b5d7-f95af507ec1f";
 
 // 수신 문자열 끝의 CR/LF는 onWrite()에서 제거한다.
-// The Jetson server routes SET@TOKEN:BUZZER as TOKEN:BUZZER to this client.
+// Legacy one-shot command and explicit web ON/OFF commands.
 constexpr char BUZZER_COMMAND[] = CLIENT_ID ":BUZZER";
+constexpr char BUZZER_ON_COMMAND[] = CLIENT_ID ":BUZZER:1";
+constexpr char BUZZER_OFF_COMMAND[] = CLIENT_ID ":BUZZER:0";
 constexpr char OK_RESPONSE[] = "OK@" CLIENT_ID "\r\n";
 
 BLECharacteristic *bleCharacteristic = nullptr;
@@ -31,15 +36,24 @@ bool buzzerActive = false;
 uint8_t completedCount = 0;
 uint32_t stateChangedAt = 0;
 
+void writeBuzzerDuty(uint8_t duty)
+{
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
+    ledcWrite(BUZZER_PIN, duty);
+#else
+    ledcWrite(BUZZER_PWM_CHANNEL, duty);
+#endif
+}
+
 void buzzerOn()
 {
-    ledcWrite(BUZZER_PIN, PWM_DUTY);
+    writeBuzzerDuty(PWM_DUTY);
     buzzerActive = true;
 }
 
 void buzzerOff()
 {
-    ledcWrite(BUZZER_PIN, 0);
+    writeBuzzerDuty(0);
     buzzerActive = false;
 }
 
@@ -104,20 +118,34 @@ class CommandCallbacks : public BLECharacteristicCallbacks
 {
     void onWrite(BLECharacteristic *characteristic) override
     {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
         String command = characteristic->getValue();
+#else
+        String command(characteristic->getValue().c_str());
+#endif
         command.trim();
 
-        if (command == BUZZER_COMMAND) {
+        if (command == BUZZER_COMMAND || command == BUZZER_ON_COMMAND) {
             startBuzzer();
             sendBleResponse(OK_RESPONSE);
             return;
+        }
+        if (command == BUZZER_OFF_COMMAND) {
+            alarmRunning = false;
+            buzzerOff();
+            sendBleResponse(OK_RESPONSE);
         }
     }
 };
 
 void setup()
 {
+#if ESP_ARDUINO_VERSION_MAJOR >= 3
     ledcAttach(BUZZER_PIN, BUZZER_FREQUENCY, PWM_RESOLUTION);
+#else
+    ledcSetup(BUZZER_PWM_CHANNEL, BUZZER_FREQUENCY, PWM_RESOLUTION);
+    ledcAttachPin(BUZZER_PIN, BUZZER_PWM_CHANNEL);
+#endif
     buzzerOff();
 
     BLEDevice::init(CLIENT_ID);

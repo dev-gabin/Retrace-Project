@@ -379,15 +379,15 @@ static void cancel_client_pings(ServerState *server, ClientInfo *client)
     pthread_mutex_unlock(&server->clients_lock);
 }
 
-static void route_message(ServerState *server, ClientInfo *sender,
-                          const char *target, const char *payload)
+static int route_message(ServerState *server, ClientInfo *sender,
+                         const char *target, const char *payload)
 {
     char line[MAX_LINE_SIZE + CLIENT_ID_SIZE + 4];
     if (strcmp(target, "ALLMSG") == 0) {
         int length = snprintf(line, sizeof(line), "[%s]%s\n", sender->id,
                               payload);
         if (length < 0 || (size_t)length >= sizeof(line))
-            return;
+            return -1;
         pthread_mutex_lock(&server->clients_lock);
         for (size_t i = 0; i < server->max_clients; ++i) {
             ClientInfo *client = &server->clients[i];
@@ -395,16 +395,20 @@ static void route_message(ServerState *server, ClientInfo *sender,
                 (void)send_client_line(client, line);
         }
         pthread_mutex_unlock(&server->clients_lock);
-        return;
+        return 1;
     }
 
+    int delivered = 0;
     pthread_mutex_lock(&server->clients_lock);
     ClientInfo *recipient = find_client(server, target);
-    if (recipient != NULL)
-        (void)send_to_client(recipient, sender->id, payload);
+    if (recipient != NULL && send_to_client(recipient, sender->id, payload) == 0)
+        delivered = 1;
     pthread_mutex_unlock(&server->clients_lock);
     if (recipient == NULL)
         (void)send_to_client(sender, "SERVER", "ERR@ROUTE:UNKNOWN_ID");
+    else if (!delivered)
+        (void)send_to_client(sender, "SERVER", "ERR@ROUTE:DELIVERY");
+    return delivered;
 }
 
 static void dispatch_line(ServerState *server, ClientInfo *client,
@@ -455,9 +459,13 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
             int result = device_handler_translate_set(
                 payload, device_id, sizeof(device_id), device_command,
                 sizeof(device_command), reason, sizeof(reason));
-            if (result == 1)
-                route_message(server, client, device_id, device_command);
-            else {
+            if (result == 1) {
+                if (route_message(server, client, device_id, device_command) == 1) {
+                    char accepted[CLIENT_ID_SIZE + 8];
+                    snprintf(accepted, sizeof(accepted), "OK@SET:%s", device_id);
+                    (void)send_to_client(client, "SERVER", accepted);
+                }
+            } else {
                 char error[64];
                 snprintf(error, sizeof(error), "ERR@SET:%s",
                          result == 0 ? "FORMAT" : reason);
@@ -488,7 +496,7 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
             (void)send_to_client(client, "SERVER", text);
         return;
     }
-    route_message(server, client, target, payload);
+    (void)route_message(server, client, target, payload);
 }
 
 static void *client_worker(void *argument)
