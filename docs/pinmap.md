@@ -7,7 +7,7 @@
 |---|---|---|---|---|
 | **STM32 #1** (NUCLEO-F411RE) | 메인 유닛 (Pan/Tilt 서보, 레이저, PIR) | `stm32/main_unit` | USB Serial (VCP) | 펌웨어·빌드 완료 / 실물 확인 전 |
 | **STM32 #2** (NUCLEO-F411RE) | 서랍 노드 (서보 ×6, LED ×6, 비상 버튼) | `stm32/drawer` | Bluetooth (HC-06) | 펌웨어·빌드 완료 / 실물 확인 전 |
-| **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25 구현·빌드 완료 / 실물 확인 전 |
+| **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED ×4) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25/26/27/32 구현·빌드 완료 / 실물 확인 전 |
 | **ESP32 #2** (ESP32-C3 Super Mini) | 부저 태그 (부저) | `esp32/buzzer_tag` | BLE | GPIO3 구현·빌드 완료 / 실물 확인 전 |
 
 ---
@@ -36,9 +36,11 @@
 | 클럭 소스 | HSI 16MHz → PLL |
 | SYSCLK / HCLK | 84 MHz |
 | APB1 peripheral clock | 42 MHz |
-| **APB1 timer clock** | **84 MHz** (TIM3, TIM4 기준 클럭) |
+| **APB1 timer clock** | **84 MHz** (메인 유닛 TIM3 기준 클럭) |
 
-### 1-3. 서보 PWM 공통 계산
+### 1-3. STM32 직접 구동 서보 PWM 계산
+
+> 이 설정은 메인 유닛의 Pan/Tilt 서보에 적용합니다. 서랍 노드는 STM32 타이머 대신 I2C2로 연결한 PCA9685를 사용합니다.
 
 | 항목 | 값 |
 |---|---|
@@ -206,21 +208,21 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 ## 3. STM32 #2 서랍 노드
 
-> 핀 배정 원본: STM32_스마트서랍_핀맵.md(핀 변경 없음). 세부 값은 1장 공통 설정과 `protocol.md` 기준.
+> 현재 핀 배정은 `drawer.ioc`와 아래 표를 기준으로 합니다. 통신 메시지는 `protocol.md` 기준입니다.
 
 ### 3-1. 담당 기능
 
 | 기능 | 설명 |
 |---|---|
-| 서랍 팝업 서보 | SG90 ×6, 서랍마다 1개 |
+| 서랍 팝업 서보 | SG90 ×6, PCA9685의 CH0~CH5로 제어 |
 | 서랍 LED | LED ×6, 열린 서랍 표시 (타이머 자동 소등) |
-| 비상 버튼 | 폰 사이렌 요청 (`EVT:BTN:SOS`) |
+| 비상 버튼 | Jetson 서버 로그 이벤트 (`EVT@clientID:SOS`); 폰 사이렌은 후속 구현 |
 | Jetson 통신 | HC-06 Bluetooth (USART1) (`protocol.md` 3장) |
 | PC 테스트 | ST-LINK VCP (USART2) — 명령 수신 · 응답 및 SOS 이벤트 |
 
 ### 3-2. 서랍 번호
 
-`protocol.md`의 `DRAWER:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
+`protocol.md`의 `clientID:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
 
 ```text
 ┌─────────┬─────────┐
@@ -235,29 +237,36 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 ### 3-3. 핀 배정
 
-**서보 PWM** (서랍`1~3` = TIM3, 서랍 `4~6` = TIM4)
+**PCA9685 I2C 연결**
 
-서보는 **1~6번 각 서랍 뒤에 1개씩** 설치해 해당 서랍을 밀어냅니다 (총 6개). 장착 위치는 이 배치로 확정합니다.
+| PCA9685 핀 | STM32 핀 | 헤더 핀 | 설정 |
+|---|---|---|---|
+| SCL | PB10 | D6 | I2C2_SCL |
+| SDA | PB9 | D14 | I2C2_SDA |
+| VCC | 3.3V | | 로직 전원 |
+| GND | GND | | 공통 접지 |
 
-| 서랍 | 위치 | 핀 | 헤더 핀 | 타이머 채널 | User Label |
-|---|---|---|---|---|---|
-| 1 | 상단 왼쪽 | PC6 | - (CN10) | TIM3_CH1 | `SERVO_1` |
-| 2 | 상단 오른쪽 | PC7 | D9 | TIM3_CH2 | `SERVO_2` |
-| 3 | 중단 왼쪽 | PC8 | - (CN10) | TIM3_CH3 | `SERVO_3` |
-| 4 | 중단 오른쪽 | PB6 | D10 | TIM4_CH1 | `SERVO_4` |
-| 5 | 하단 왼쪽 | PB7 | - (CN7) | TIM4_CH2 | `SERVO_5` |
-| 6 | 하단 오른쪽 | PB8 | D15 | TIM4_CH3 | `SERVO_6` |
+서보는 **1~6번 각 서랍 뒤에 1개씩** 설치하고, PCA9685 채널도 같은 번호 순서로 사용합니다.
+
+| 서랍 | 위치 | PCA9685 채널 |
+|---|---|---|
+| 1 | 상단 왼쪽 | CH0 |
+| 2 | 상단 오른쪽 | CH1 |
+| 3 | 중단 왼쪽 | CH2 |
+| 4 | 중단 오른쪽 | CH3 |
+| 5 | 하단 왼쪽 | CH4 |
+| 6 | 하단 오른쪽 | CH5 |
 
 **서랍 LED**
 
 | 서랍 | 핀 | 헤더 핀 | 설정 | User Label |
 |---|---|---|---|---|
-| 1 | PC0 | A5 | GPIO_Output | `LED_1` |
-| 2 | PC1 | A4 | GPIO_Output | `LED_2` |
-| 3 | PC2 | - (CN7) | GPIO_Output | `LED_3` |
-| 4 | PC3 | - (CN7) | GPIO_Output | `LED_4` |
-| 5 | PC4 | - (CN10) | GPIO_Output | `LED_5` |
-| 6 | PC5 | - (CN10) | GPIO_Output | `LED_6` |
+| 1 | PA0 | A0 | GPIO_Output | `LED_1` |
+| 2 | PA1 | A1 | GPIO_Output | `LED_2` |
+| 3 | PA4 | A2 | GPIO_Output | `LED_3` |
+| 4 | PB0 | A3 | GPIO_Output | `LED_4` |
+| 5 | PC1 | A4 | GPIO_Output | `LED_5` |
+| 6 | PC0 | A5 | GPIO_Output | `LED_6` |
 
 **HC-06 Bluetooth**
 
@@ -276,11 +285,11 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 | 부품 핀 | STM32 핀 | 헤더 핀 | 설정 | User Label |
 |---|---|---|---|---|
-| 버튼 신호 | PA4 | A2 | GPIO_EXTI4, Pull-up, Falling edge | `SOS_BTN` |
+| 버튼 신호 | PB5 | D4 | GPIO_Input, Pull-up | `SOS_BTN` |
 | 버튼 반대쪽 | GND | | 공통 접지 | |
 
-- 평소 Pull-up으로 HIGH → 누르면 GND와 연결되어 LOW (Falling edge 감지)
-- EXTI4는 **전용 인터럽트**(`EXTI4_IRQn`)라 다른 핀과 공유하지 않음
+- 평소 Pull-up으로 HIGH → 누르면 GND와 연결되어 LOW
+- 인터럽트 없이 메인 루프에서 폴링하며 코드에서 50ms 디바운싱
 
 **미사용 핀**
 
@@ -290,14 +299,20 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 ### 3-4. CubeMX 설정
 
-**TIM3 · TIM4 (서보)** — 1-3 공통 설정 + 아래
+**I2C2 (PCA9685)**
 
 | 항목 | 값 |
 |---|---|
-| Channel 1~3 | PWM Generation CH1 / CH2 / CH3 (Channel 4 Disable) |
-| Pulse (CH1~3) | **0** (신호 없음 → 전원 켜도 서보가 움직이지 않음) |
+| Mode | I2C |
+| Clock Speed | **100000 Hz** (Standard Mode) |
+| Addressing Mode | 7-bit |
+| SCL / SDA | PB10 / PB9 |
+| GPIO | Alternate Function Open Drain, No pull, Very High speed |
+| DMA / NVIC | 사용 안 함 (폴링 방식) |
+| PCA9685 주소 | 7-bit `0x40` (HAL 전달값 `0x40 << 1`) |
+| PCA9685 PWM | **50Hz**, CH0~CH5 사용 |
 
-> 메인 유닛의 Pan/Tilt 서보는 시작 Pulse 1500(중앙)이며, 서랍 서보는 부팅 시 Pulse 0으로 신호를 보내지 않습니다. 각 서랍 뒤에 설치한 서보의 복귀·밀어내기 펄스 값은 실물 테스트에서 맞춥니다.
+> TIM3/TIM4는 사용하지 않습니다. 부팅 시 PCA9685 CH0~CH5를 Full OFF로 두고, 복귀·밀어내기 펄스 값은 실물 테스트에서 맞춥니다.
 
 **USART1 (HC-06)**
 
@@ -317,9 +332,9 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 | 핀 | 설정 |
 |---|---|
-| PC0~PC5 | GPIO_Output, Output level **Low**(부팅 시 꺼짐), Push Pull, No pull, Speed Low |
-| PA4 | GPIO_EXTI4, External Interrupt Falling edge, **Pull-up** |
-| NVIC | **EXTI line4 interrupt Enable** |
+| PA0, PA1, PA4, PB0, PC1, PC0 | GPIO_Output, Output level **Low**(부팅 시 꺼짐), Push Pull, No pull, Speed Low |
+| PB5 | GPIO_Input, **Pull-up** (`SOS_BTN`) |
+| NVIC | SOS 버튼 및 I2C2 인터럽트 사용 안 함 |
 
 **Project Manager** — 1-4 공통 + Project Name `drawer`, Location `Retrace-Project/stm32/`
 
@@ -327,8 +342,10 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 | 항목 | 내용 |
 |---|---|
-| 서보 전원 | 외부 5V **2A 이상** 권장 (서보 6개) |
-| GND | 외부 5V 전원 GND · STM32 GND · HC-06 GND **공통 연결** |
+| PCA9685 로직 전원 | VCC는 STM32 **3.3V**에 연결 |
+| 서보 전원 | PCA9685 V+에 외부 **5~6V, 2A 이상** 권장 (서보 6개) |
+| I2C | PB10(D6) → SCL, PB9(D14) → SDA; 모듈의 풀업 저항 사용 |
+| GND | 외부 서보 전원 GND · PCA9685 GND · STM32 GND · HC-06 GND **공통 연결** |
 | 서보 동작 | 코드에서 **한 번에 하나씩만** 움직이게 해서 전류 몰림 방지 |
 | LED | 핀마다 **전류 제한 저항**(220~330Ω) 직렬 연결 |
 | 비상 버튼 | 내부 Pull-up 사용 → 외부 저항 불필요, 채터링은 코드에서 처리 |
@@ -336,22 +353,23 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 ### 3-6. 진행 상황
 
 - [x] 프로젝트 생성 (`drawer.ioc`, NUCLEO-F411RE, 보드 기본 설정)
-- [x] 클럭 확인 → APB1 timer clock 84MHz, PSC 83 확정
-- [x] TIM3: PC6/PC7/PC8 = `SERVO_1~3`, Pulse 0
-- [x] TIM4: PB6/PB7/PB8 = `SERVO_4~6`, Pulse 0
+- [x] TIM3/TIM4 비활성화
+- [x] I2C2: PB10/PB9 = SCL/SDA, Standard Mode 100kHz
+- [x] PCA9685: CH0~CH5 = 서랍 1~6, 50Hz 제어 코드 구현
 - [x] USART1: PA9/PA10 = `HC06_TX`/`HC06_RX`, 9600, NVIC
-- [x] GPIO: PC0~PC5 = `LED_1~6`
-- [x] PA4 = `SOS_BTN` (EXTI4), NVIC
-- [x] Project Manager → 코드 생성 → 빌드 확인
+- [x] GPIO: PA0/PA1/PA4/PB0/PC1/PC0 = `LED_1~6`
+- [x] PB5 = `SOS_BTN` (GPIO Input, Pull-up, 폴링)
+- [x] Project Manager → 코드 생성
 - [x] UART 명령 · LED · 서보 순차 밀기·복귀 · 10초 소등 · SOS 이벤트 구현
-- [x] 빌드 성공·경고 0개
-- [ ] 서보 펄스 보정 · 보드 업로드 및 실물 동작 확인
+- [x] PCA9685 전환 후 Debug 빌드 성공·경고 0개
+- [ ] I2C 연결 · PCA9685 주소 · 서보 펄스 보정 · 보드 업로드 및 실물 동작 확인
 
 ### 3-7. 확인 필요 항목
 
 - [ ] 서랍 실제 배치 (2열× 3행 맞는지, LED 연결이 위 번호 그림과 일치하는지)
 - [ ] HC-06 통신 속도 (9600 기본값인지)
-- [ ] 서보 복귀 / 밀어내기 Pulse 값 보정 (장착 위치: 각 서랍 뒤에 1개씩 확정)
+- [ ] PCA9685 주소 `0x40` 응답 및 50Hz 출력 확인
+- [ ] 서보 복귀 / 밀어내기 Pulse 값 보정 (현재 1000µs / 2000µs)
 - [ ] PB1 미사용 이유 기록
 
 ---
@@ -398,10 +416,13 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 | 부품 | 핀 | 설정 | 코드 상수 |
 |---|---|---|---|
 | PIR 출력 | **GPIO34** | `INPUT` | `PIR_PIN` |
-| 현관등 LED | **GPIO25** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PIN` |
+| 현관등 LED 1 | **GPIO25** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[0]` |
+| 현관등 LED 2 | **GPIO26** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[1]` |
+| 현관등 LED 3 | **GPIO27** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[2]` |
+| 현관등 LED 4 | **GPIO32** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[3]` |
 
 - **PIR → GPIO34**: 입력 전용 핀이라 센서 입력에 적합. 내부 풀다운이 없으므로 센서가 빠졌을 때 오작동이 걱정되면 **외부 10kΩ 풀다운** 추가
-- **현관등 LED**: 한 색 LED, GPIO25로 구현. 전류 제한 저항 필요. 실제 LED 종류·구동 회로는 강의실에서 확인.
+- **현관등 LED ×4**: GPIO25/26/27/32로 동시에 제어. LED마다 220~330Ω 전류 제한 저항을 하나씩 직렬 연결.
 
 - PIR 50ms 필터, 움직임 종료 후 10초 점등 유지. `ALERT`는 250ms마다 ON/OFF하며 10초 후 기본 센서등 모드로 복귀 (시간은 코드 맨 위 임시 상수).
 - Wi-Fi·MQTT가 없어도 기본 센서등 동작. 실제 업로드·PIR·LED·네트워크 검증은 강의실에서 진행.
@@ -421,7 +442,7 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 - [x] PIR 센서등·시간 유지·NORMAL/ALERT·Wi-Fi/MQTT·재연결 구현
 - [x] 기본·네트워크 활성화 빌드 성공·경고 0개
 - [ ] 개인 `network_config.h`에 Wi-Fi·Jetson IP 입력 후 실제 보드용 `lolin_d32` 재빌드·업로드
-- [ ] PIR·LED 구동, 실제 MQTT 발행·구독·연결 유실 검증
+- [ ] PIR·LED ×4 구동, 실제 MQTT 발행·구독·연결 유실 검증
 
 ---
 
@@ -465,8 +486,8 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 ## 7. 전체 확인 필요 항목
 
 - [ ] STM32 #1: 레이저 모듈 전류, PIR 모델, SG90 동작 범위
-- [ ] STM32 #2: 서랍 실제 배치, HC-06 통신 속도, 서보 밀기·복귀 펄스와 시간 보정, PB1 미사용 이유
-- [ ] ESP32 #1: PIR 모델, 한 색 LED 구동 회로·실제 점등, Wi-Fi/MQTT 연결
+- [ ] STM32 #2: PCA9685 I2C 연결·주소, 서랍 실제 배치, HC-06 통신 속도, 서보 밀기·복귀 펄스와 시간 보정, PB1 미사용 이유
+- [ ] ESP32 #1: PIR 모델, 한 색 LED ×4 구동 회로·실제 점등, Wi-Fi/MQTT 연결
 - [ ] ESP32 #2: 부저 종류·전류, 배터리
 
 실행 항목과 결과 기록은 [강의실 통합 테스트](classroom_test_checklist.md)에서 관리합니다. 보드 단독 검증 후 feature → develop PR로 기능을 통합하고 Jetson·웹과 전체 연동을 확인합니다.

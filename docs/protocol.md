@@ -43,7 +43,7 @@ USB Serial과 Bluetooth(HC-06) 모두 **같은 문자 형식**을 씁니다. PC 
 | 성공 응답 | `OK:명령` | `OK:AIM` |
 | 실패 응답 | `ERR:명령:이유` | `ERR:AIM:RANGE` |
 | 모르는 명령 | `ERR:UNKNOWN` | |
-| 보드가 먼저 보내는 이벤트 | `EVT:종류:값` | `EVT:PIR:1` |
+| 보드가 먼저 보내는 이벤트 | `EVT@종류:값` | `EVT@PIR:1` |
 
 - 명령을 받으면 **반드시 `OK` 또는 `ERR`로 응답**합니다.
 - Jetson은 응답을 **1초** 기다리고, 없으면 **1회 재전송**합니다. 그래도 없으면 연결 오류로 처리합니다.
@@ -51,7 +51,7 @@ USB Serial과 Bluetooth(HC-06) 모두 **같은 문자 형식**을 씁니다. PC 
 
 ```text
 Jetson → AIM:90,90
-STM32  → EVT:PIR:1     ← 응답 대기 중 이벤트 도착 → 이벤트로 처리
+STM32  → EVT@PIR:1     ← 응답 대기 중 이벤트 도착 → 이벤트로 처리
 STM32  → OK:AIM        ← 이게 AIM의 응답
 ```
 
@@ -59,7 +59,7 @@ STM32  → OK:AIM        ← 이게 AIM의 응답
 
 | 명령 | 응답 | 설명 |
 |---|---|---|
-| `PING` | `OK:PING` | 연결 확인 |
+| `PING` | `OK@PING` | 연결 확인 |
 
 ---
 
@@ -89,8 +89,8 @@ STM32  → OK:AIM        ← 이게 AIM의 응답
 
 | 이벤트 | 설명 |
 |---|---|
-| `EVT:PIR:1` | 움직임 감지 시작 |
-| `EVT:PIR:0` | 움직임 감지 종료 |
+| `EVT@PIR:1` | 움직임 감지 시작 |
+| `EVT@PIR:0` | 움직임 감지 종료 |
 
 예시:
 
@@ -99,7 +99,7 @@ Jetson → AIM:120,45
 STM32  → OK:AIM
 Jetson → LASER:ON
 STM32  → OK:LASER
-STM32  → EVT:PIR:1
+STM32  → EVT@PIR:1
 ```
 
 ---
@@ -281,7 +281,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 ```json
 {
-  "item": "carkey",
+  "item": "car_key",
   "pos_x": 412,
   "pos_y": 288,
   "seen_at": "2026-10-03T05:22:05.000000Z",
@@ -390,9 +390,9 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 | 이름 | 물건 |
 |---|---|
-| `carkey` | 차키 |
-| `airpods` | 에어팟 |
-| `wallet` | 지갑 |
+| `car_key` | 차키 (YOLO class 80) |
+| `wallet` | 지갑 (YOLO class 81) |
+| `earphones` | 이어폰 및 충전 케이스 (YOLO class 82) |
 
 > 학습 데이터셋 클래스 이름도 위 이름과 **똑같이** 맞춥니다.
 
@@ -405,7 +405,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 - [ ] ntfy 서버 포트
 - [ ] HTTP API JSON 임시안(7-1)을 Jetson·웹 담당자가 함께 확정, 장치 오류·완료 응답 방식 정의
 - [ ] Storage API의 `observed`·`has_position`과 반환 코드를 HTTP JSON·상태 코드로 변환하는 규칙 확정
-- [ ] Jetson·웹·학습 모델의 물건 ID 일치 확인 (`carkey` / `airpods` / `wallet`)
+- [ ] 추적 물건 목록 최종 확정 (안경 / 지갑)
 
 ---
 
@@ -415,7 +415,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 |---|---|
 | v0.1 | 최초 초안 |
 | v0.2 | 대소문자 규칙(**대문자만**, 소문자는 `ERR:UNKNOWN`), 보드 이름·담당·폴더 표기 통일, 서랍 번호 그림, STM32 #2 USART1·디버그 USART2 구분, 핀맵 문서 연결 |
-| v0.3 | 이벤트 끼어들기 처리 규칙, `PING` 응답 `OK:PING`으로 통일, 형식 설명(`:` / `,`) 수정, BLE 값 ASCII 명시, ntfy 제목 영문·본문 한글로 통일, MQTT 대소문자 범위(연결 상태는 관례대로 소문자) 명시 |
+| v0.3 | 이벤트 끼어들기 처리 규칙, 당시 `PING` 응답 형식 통일, 형식 설명(`:` / `,`) 수정, BLE 값 ASCII 명시, ntfy 제목 영문·본문 한글로 통일, MQTT 대소문자 범위(연결 상태는 관례대로 소문자) 명시 |
 | v0.4 | 서랍 번호 배치를 pinmap.md 3-2 기준(2열 × 3행)으로 통일 |
 | v0.5 | 현관등 PIR·ALERT·QoS 1 구현 기준 명시, 부저 자동 정지 제거 및 웹 끄기 요청 기준 반영 |
 | v0.6 | `Retrace_API_Guide_v2.pdf` 기준으로 MariaDB·C Storage API, 관측 여부·좌표 여부, UTC 시각·사진 경로, 반환 코드·복구 규칙 반영. 관련 Last Seen JSON 예제 수정, HTTP 형식은 초안 유지 |
