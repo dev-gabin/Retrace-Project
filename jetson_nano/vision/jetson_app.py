@@ -52,11 +52,18 @@ def main() -> None:
         stm32.close()
         return
 
-    camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    camera.set(cv2.CAP_PROP_FPS, 30)
-    camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+    # camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
+    # camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    # camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # camera.set(cv2.CAP_PROP_FPS, 30)
+    # camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+    # 카메라 자동 노출 안정화 및 초기 불완전 프레임 제거
+    time.sleep(1.0)
+    for _ in range(30):
+        camera.read()
+
+    
 
     # 카메라 자동 노출 안정화 및 초기 불완전 프레임 제거
     time.sleep(1.0)
@@ -138,13 +145,40 @@ def main() -> None:
 
             for detection in tracker.update(detections):
                 center = detection["center"]
+                x1, y1, x2, y2 = detection["bbox"]
+
+                # 추론용 원본은 유지하고 저장용 복사본에만 표시한다.
+                snapshot_frame = frame.copy()
+                cv2.rectangle(
+                    snapshot_frame,
+                    (x1, y1),
+                    (x2, y2),
+                    (0, 255, 0),
+                    2,
+                )
+                label = f"{detection['name']} {detection['confidence']:.2f}"
+                cv2.putText(
+                    snapshot_frame,
+                    label,
+                    (x1, max(y1 - 10, 20)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 0),
+                    2,
+                    cv2.LINE_AA,
+                )
+
                 try:
                     saved = storage.save(
-                        detection["item_id"], frame, center[0], center[1]
+                        detection["item_id"],
+                        snapshot_frame,
+                        center[0],
+                        center[1],
                     )
                 except LastSeenError as error:
                     print(f"[SAVE ERROR] {detection['name']}: {error}")
                     continue
+
                 tracker.mark_saved(detection["item_id"], center)
                 print(
                     f"[SAVED] {detection['name']} "
@@ -162,3 +196,6 @@ def main() -> None:
         stm32.close()
         storage.close()
         print("[END] Jetson YOLO mode")
+        
+if __name__ == "__main__":
+    main()

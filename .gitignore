@@ -63,3 +63,11 @@ Thumbs.db
 /jetson_nano/client/bluetooth/client_bluetooth
 /jetson_nano/client/ble/client_ble
 *.swp
+/jetson_nano/client/clientID.conf
+/jetson_nano/client/bluetooth/client_bluetooth
+/jetson_nano/client/ble/client_ble
+*.swp
+
+# Jetson runtime data / credentials
+/data/
+/jetson_nano/.local/

@@ -95,7 +95,7 @@ class Stm32Link:
         settle_seconds: float = 0.5,
         on_seconds: float = 1.0,
     ) -> None:
-        if settle_seconds < 0 or not 0 < on_seconds <= 3.0:
+        if settle_seconds < 0 or not 0 < on_seconds <= 5.0:
             raise ValueError("invalid settle or laser-on duration")
         self.laser(False)
         self.aim(pan, tilt)
@@ -152,8 +152,9 @@ class Stm32Link:
                     continue
                 if line.startswith("EVT@"):
                     self._events.put(line)
-                else:
-                    self._responses.put(line)
+                elif line.startswith(("OK@", "ERR@")):
+                    self._responses.put(line)    
+                               
         except (OSError, serial.SerialException) as error:
             if not self._stop.is_set():
                 self._reader_error = error

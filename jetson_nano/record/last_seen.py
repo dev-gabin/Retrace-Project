@@ -226,7 +226,7 @@ class LastSeenStore:
         login = f"[{self.client_id}:{self.password}]".encode("ascii")
         connection.sendall(login)
         sender, response = self._read_message(connection)
-        if sender != "SERVER" or "New connected!" not in response:
+        if "New connected!" not in response:
             connection.close()
             raise LastSeenError(f"Server login failed: [{sender}]{response}")
         self._connection = connection
