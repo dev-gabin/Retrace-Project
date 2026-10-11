@@ -37,5 +37,24 @@ int main() {
     assert(count == 3 && !strcmp(rows[1].item, "airpods") && !strcmp(rows[2].item, "wallet"));
     assert(!morningHour(6, 7, 8) && morningHour(7, 7, 8) && !morningHour(8, 7, 8));
     assert(intervalElapsed(4, UINT32_MAX - 5, 10));
-    puts("PASS: UTC/KST rollover, timestamp validation, newest 3 sorting, schedule and millis rollover");
+    size_t displayPage = 4;
+    uint32_t displayAt = 1000;
+    bool updated = true;
+    assert(advanceDisplayPage(5999, updated, 1000, displayPage, displayAt, 6, 5000, 5000));
+    assert(displayPage == 0 && updated);
+    assert(!advanceDisplayPage(6000, updated, 1000, displayPage, displayAt, 6, 5000, 5000));
+    assert(displayPage == 1 && !updated && displayAt == 6000);
+    assert(!advanceDisplayPage(10999, updated, 1000, displayPage, displayAt, 6, 5000, 5000));
+    assert(displayPage == 1);
+    assert(!advanceDisplayPage(11000, updated, 1000, displayPage, displayAt, 6, 5000, 5000));
+    assert(displayPage == 2);
+    // A later new observation interrupts the normal rotation again.
+    updated = true;
+    assert(advanceDisplayPage(11001, updated, 11001, displayPage, displayAt, 6, 5000, 5000));
+    assert(displayPage == 0);
+    updated = true;
+    assert(advanceDisplayPage(20, updated, UINT32_MAX - 1000, displayPage, displayAt, 6, 5000, 5000));
+    assert(!advanceDisplayPage(4000, updated, UINT32_MAX - 1000, displayPage, displayAt, 6, 5000, 5000));
+    assert(displayPage == 1 && !updated);
+    puts("PASS: timestamp/sorting/schedule and 5s record priority, rotation resume, rollover");
 }

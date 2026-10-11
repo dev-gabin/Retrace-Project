@@ -31,6 +31,9 @@ LastSeenReading lastSeen[LAST_SEEN_LIMIT];
 unsigned lastSeenCount = 0;
 bool lastSeenLoaded = false, lastSeenOkay = false, firstLastSeen = true;
 bool recordUpdated = false;
+// Old private config headers may still contain PAGE_MS=3000; enforce 5s minimum.
+constexpr uint32_t pageIntervalMs = PAGE_MS < 5000 ? 5000 : PAGE_MS;
+constexpr uint32_t newRecordHoldMs = 5000;
 uint32_t lastSeenAt = 0, lastSeenSuccessAt = 0, recordUpdatedAt = 0;
 // Default also supports an existing private config copied before this feature.
 #ifndef LAST_SEEN_REFRESH_MS
@@ -98,16 +101,15 @@ void fetchLastSeen() {
         strcpy(reading.item, id);
         insertLastSeen(next, count, reading);
     }
-    bool changed = count != lastSeenCount;
-    for (unsigned i = 0; i < count; ++i)
-        if (strcmp(next[i].item, lastSeen[i].item) || next[i].utcMicros != lastSeen[i].utcMicros) changed = true;
+    bool initialLoad = !lastSeenLoaded;
     // First load may be an old DB record. Do not call it a newly recorded event.
     bool newer = lastSeenLoaded && count && (!lastSeenCount || next[0].utcMicros > lastSeen[0].utcMicros);
     for (unsigned i = 0; i < LAST_SEEN_LIMIT; ++i) lastSeen[i] = next[i];
     lastSeenCount = count; lastSeenLoaded = lastSeenOkay = true;
     lastSeenSuccessAt = millis();
-    if (changed) { page = 0; pageAt = millis(); }
+    if (initialLoad || newer) { page = 0; pageAt = millis(); }
     if (newer) { recordUpdated = true; recordUpdatedAt = millis(); }
+    if (!count) recordUpdated = false;
     Serial.printf("Last seen refreshed: %u camera records\n", count);
 }
 
@@ -197,8 +199,8 @@ void render() {
     size_t slots = itemCount ? itemCount : 1;
     size_t seenSlots = lastSeenCount ? lastSeenCount : 1;
     size_t total = seenSlots + 2 + (morning ? slots : 0) + (forecastFresh && bringUmbrella ? 1 : 0);
-    if (intervalElapsed(millis(), pageAt, PAGE_MS)) { pageAt = millis(); page = (page + 1) % total; }
-    page %= total;
+    bool priorityRecord = advanceDisplayPage(millis(), recordUpdated, recordUpdatedAt,
+                                            page, pageAt, total, pageIntervalMs, newRecordHoldMs);
     String marker = WiFi.status() != WL_CONNECTED ? "Offline" : "Weather old";
     if (page < seenSlots) {
         bool fresh = lastSeenOkay && WiFi.status() == WL_CONNECTED
@@ -213,7 +215,7 @@ void render() {
             char heading[17], observedTime[7];
             snprintf(heading, sizeof(heading), "%s %02d/%02d", fresh ? "Last seen" : "Cached", observed.tm_mon + 1, observed.tm_mday);
             snprintf(observedTime, sizeof(observedTime), " %02d:%02d", observed.tm_hour, observed.tm_min);
-            if (fresh && page == 0 && recordUpdated && !intervalElapsed(millis(), recordUpdatedAt, PAGE_MS))
+            if (fresh && priorityRecord)
                 strcpy(heading, "Record updated");
             writeLcd(heading, labelFor(reading.item).substring(0, 10) + observedTime);
         }

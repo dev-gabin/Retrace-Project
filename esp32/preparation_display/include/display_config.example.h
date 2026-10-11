@@ -17,7 +17,7 @@ constexpr unsigned long ITEMS_REFRESH_MS = 15000;
 #define LAST_SEEN_REFRESH_MS 10000UL
 constexpr unsigned long WEATHER_REFRESH_MS = 600000;
 constexpr unsigned long WEATHER_RETRY_MS = 30000;
-constexpr unsigned long PAGE_MS = 3000;
+constexpr unsigned long PAGE_MS = 5000;
 constexpr int RAIN_PROBABILITY_THRESHOLD = 50;
 // ASCII aliases for custom IDs. Standard 1602 cannot show Korean.
 struct ItemAlias { const char *id; const char *label; };
