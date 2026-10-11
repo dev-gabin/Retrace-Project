@@ -2,7 +2,7 @@
 
 Jetson Nano에서 실행할 C TCP 서버와 MariaDB 저장 모듈의 안내입니다. 이 문서는 `jetson_nano/server_jetson/` 기준으로 빌드·실행 방법과 각 모듈의 책임을 설명합니다.
 
-현재 구현은 TCP 로그인, 클라이언트 메시지 라우팅, DB의 `LIST`·`GET`·`SAVE`, JPEG 스냅샷 검증 및 관리입니다. 장치 `SET@clientID:OPEN:n`은 지정한 클라이언트로 라우팅하며, `EVT@clientID:SOS`는 서버 로그에만 기록합니다. HTTP API, 카메라/AI 파이프라인, 실제 SOS 후속 동작은 아직 구현되지 않았습니다.
+현재 구현은 TCP 로그인, 클라이언트 메시지 라우팅, DB의 `LIST`·`GET`·`SAVE`, JPEG 스냅샷 검증 및 관리입니다. 장치 `SET@clientID:OPEN:n`, `SET@clientID:BUZZER[:1|0]`, `SET@clientID:LIGHT:ALERT|NORMAL`은 지정한 클라이언트로 라우팅합니다(`LIGHT`는 현관등이 받는 `ALERT`/`NORMAL`만 전달). 장치가 보낸 `EVT@...`(현관 `PIRON`, 서랍 `SOS` 등)는 서버 로그에 기록하고, `RETRACE_EVENT_CLIENT_ID`(기본 `EVENT`) 클라이언트가 접속해 있으면 `[보낸ID]EVT@...` 형식으로 함께 전달합니다. `jetson_app.py`가 이 ID로 접속해 외출 알림(현관등 ALERT·ntfy·레이저)과 SOS ntfy 알림을 처리합니다.
 
 ## 빌드 대상과 구성
 

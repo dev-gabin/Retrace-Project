@@ -7,7 +7,7 @@ const labels = { car_key: '차키', carkey: '차키', airpods: '에어팟', earp
 const icons = { car_key: 'key', carkey: 'key', airpods: 'airpods', earphones: 'airpods', wallet: 'wallet' };
 const descriptions = { car_key: '외출할 때 함께', carkey: '외출할 때 함께', airpods: '나만의 작은 음악', earphones: '나만의 작은 음악', wallet: '외출할 때 챙기는 지갑' };
 const stateLabels = { visible: '마지막 화면에서 확인', occluded: '가려진 상태로 기록', uncertain: '위치 확인 필요' };
-const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [] };
+const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [], leaveItems: new Set() };
 const $ = id => document.getElementById(id);
 let toastTimer;
 
@@ -84,6 +84,12 @@ function renderItems() {
       span.textContent = text;
       button.append(span);
     }
+    if (state.leaveItems.has(record.item)) {
+      const badge = document.createElement('span');
+      badge.className = 'item-badge';
+      badge.textContent = '외출 알림';
+      button.append(badge);
+    }
     button.addEventListener('click', () => selectItem(record.item));
     fragment.append(button);
   }
@@ -98,6 +104,10 @@ function updateButtons() {
   $('drawer-open-button').disabled = state.busy.has('drawer');
   $('buzzer-on-button').disabled = state.busy.has('buzzer');
   $('buzzer-off-button').disabled = state.busy.has('buzzer');
+  const registered = state.selected !== null && state.leaveItems.has(state.selected);
+  $('leave-button').disabled = state.selected === null || state.busy.has('leave');
+  $('leave-button').setAttribute('aria-pressed', String(registered));
+  $('leave-button-label').textContent = registered ? '외출 알림 해제' : '외출 알림 등록';
 }
 
 function clearPhoto(title) {
@@ -180,8 +190,9 @@ async function refreshItems() {
   $('refresh-button').classList.add('is-loading');
   $('item-list').setAttribute('aria-busy', 'true');
   try {
-    const items = await api.listItems();
+    const [items, leaveItems] = await Promise.all([api.listItems(), api.getLeaveItems().catch(() => null)]);
     state.items = items;
+    if (leaveItems) state.leaveItems = new Set(leaveItems);
     showError();
     if (items.length) await selectItem(items.some(record => record.item === state.selected) ? state.selected : items[0].item);
     else { ++state.detailSequence; state.selected = null; state.record = null; state.detailLoading = false; renderItems(); renderDetail(); }
@@ -254,6 +265,15 @@ document.querySelectorAll('[data-drawer]').forEach(button => button.addEventList
 $('drawer-open-button').addEventListener('click', () => {
   const n = state.drawer;
   command('drawer', 'drawer', `${n}번 서랍 열기`, () => api.openDrawer(n));
+});
+$('leave-button').addEventListener('click', () => {
+  const item = state.selected;
+  if ($('leave-button').disabled || item === null) return;
+  const registered = state.leaveItems.has(item);
+  const next = registered ? [...state.leaveItems].filter(entry => entry !== item) : [...state.leaveItems, item];
+  command('leave', 'key', `${itemLabel(item)} 외출 알림 ${registered ? '해제' : '등록'}`, async () => {
+    state.leaveItems = new Set(await api.setLeaveItems(next));
+  }, () => { renderItems(); updateButtons(); });
 });
 $('related-drawer-button').addEventListener('click', () => {
   if (state.record?.drawer_id === null || !state.record) return;

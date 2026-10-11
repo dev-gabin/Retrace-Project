@@ -162,3 +162,24 @@ test('모드·서버 주소·제한 시간 설정 오류를 알린다', () => {
     assert.throws(() => createApi(options), hasCode('INVALID_CONFIG'));
   }
 });
+
+test('외출 알림 물건 목록을 조회하고 저장한다', async () => {
+  const { api, calls } = liveWith(url => url.endsWith('/api/leave-items') ? { ok: true, items: ['carkey', 'wallet'] } : {});
+  assert.deepEqual(await api.getLeaveItems(), ['carkey', 'wallet']);
+  assert.deepEqual(await api.setLeaveItems(['carkey', 'wallet']), ['carkey', 'wallet']);
+  assert.deepEqual(calls.map(({ url, method, body }) => [url, method, body]), [
+    ['http://jetson.local:8080/api/leave-items', 'GET', undefined],
+    ['http://jetson.local:8080/api/leave-items', 'POST', '{"items":["carkey","wallet"]}'],
+  ]);
+  await assert.rejects(api.setLeaveItems(['Bad ID']), hasCode('INVALID_ITEM'));
+  await assert.rejects(api.setLeaveItems('carkey'), hasCode('INVALID_LEAVE_ITEMS'));
+  const broken = liveWith({ items: ['Bad ID'] }).api;
+  await assert.rejects(broken.getLeaveItems(), hasCode('BAD_RESPONSE'));
+});
+
+test('샘플 모드는 외출 알림 등록을 네트워크 없이 기억한다', async () => {
+  const api = createApi({ fetchImpl: async () => { throw new Error('network forbidden'); } });
+  assert.deepEqual(await api.getLeaveItems(), ['carkey']);
+  assert.deepEqual(await api.setLeaveItems(['carkey', 'wallet']), ['carkey', 'wallet']);
+  assert.deepEqual(await api.getLeaveItems(), ['carkey', 'wallet']);
+});

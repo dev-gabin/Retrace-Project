@@ -81,6 +81,21 @@ int device_handler_translate_set(const char *payload,
         return 1;
     }
 
+    /* The entrance node accepts the bare light command, without a client ID. */
+    if (action_length == sizeof("LIGHT") - 1 &&
+        memcmp(action, "LIGHT", action_length) == 0) {
+        const char *mode = second_colon != NULL ? second_colon + 1 : NULL;
+        if (mode == NULL ||
+            (strcmp(mode, "ALERT") != 0 && strcmp(mode, "NORMAL") != 0))
+            return invalid(reason, reason_capacity, "FORMAT");
+        if (strlen(mode) >= device_command_capacity)
+            return invalid(reason, reason_capacity, "INTERNAL");
+        memcpy(device_id, target, target_length);
+        device_id[target_length] = '\0';
+        snprintf(device_command, device_command_capacity, "%s", mode);
+        return 1;
+    }
+
     if (second_colon == NULL || strchr(second_colon + 1, ':') != NULL)
         return invalid(reason, reason_capacity, "FORMAT");
     number = second_colon + 1;

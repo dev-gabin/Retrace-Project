@@ -210,6 +210,22 @@ static ClientInfo *find_client(ServerState *server, const char *id)
     return NULL;
 }
 
+/* Copy device events to the Jetson app's listener client, if it is online. */
+static void forward_event(ServerState *server, ClientInfo *sender,
+                          const char *payload)
+{
+    const char *listener_id = getenv("RETRACE_EVENT_CLIENT_ID");
+    if (listener_id == NULL || listener_id[0] == '\0')
+        listener_id = "EVENT";
+    if (strcmp(sender->id, listener_id) == 0)
+        return;
+    pthread_mutex_lock(&server->clients_lock);
+    ClientInfo *listener = find_client(server, listener_id);
+    if (listener != NULL)
+        (void)send_to_client(listener, sender->id, payload);
+    pthread_mutex_unlock(&server->clients_lock);
+}
+
 static int is_database_command(const char *payload)
 {
     const char *end = strchr(payload, '@');
@@ -473,6 +489,7 @@ static void dispatch_line(ServerState *server, ClientInfo *client,
             }
         } else if (strncmp(payload, "EVT@", 4) == 0) {
             printf("[%s] %s\n", client->id, payload);
+            forward_event(server, client, payload);
         } else if (strncmp(payload, "OK@", 3) == 0) {
             printf("[SERVER][OK][from:%s] %s\n", client->id, payload);
         } else if (strncmp(payload, "ERR@", 4) == 0) {

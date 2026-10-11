@@ -39,6 +39,13 @@ export function validateItem(record) {
   return { item: record.item, pos_x: record.pos_x, pos_y: record.pos_y, seen_at: record.seen_at, snapshot: record.snapshot, drawer_id: record.drawer_id, state: record.state };
 }
 
+function leaveItemList(data) {
+  if (!Array.isArray(data?.items) || !data.items.every(item => typeof item === 'string' && itemIdPattern.test(item))) {
+    throw new ApiError('BAD_RESPONSE', '서버의 외출 알림 목록 형식이 프로토콜과 다릅니다.');
+  }
+  return [...data.items];
+}
+
 function acknowledged(result) {
   if (!result || result.ok !== true) throw new ApiError('BAD_RESPONSE', '서버의 요청 접수 응답을 확인할 수 없습니다.');
   return result;
@@ -101,6 +108,14 @@ export function createApi({ mode = 'demo', apiBaseUrl = '', timeoutMs = 8000, fe
     async setBuzzer(enabled) {
       if (typeof enabled !== 'boolean') throw new ApiError('INVALID_BUZZER', '부저 요청은 켜기 또는 끄기로 정해야 합니다.');
       return acknowledged(mode === 'demo' ? await demo.setBuzzer(enabled) : await request('/api/buzzer', { method: 'POST', body: { enabled } }));
+    },
+    async getLeaveItems() {
+      return leaveItemList(mode === 'demo' ? await demo.getLeaveItems() : await request('/api/leave-items'));
+    },
+    async setLeaveItems(items) {
+      if (!Array.isArray(items) || items.length > 20) throw new ApiError('INVALID_LEAVE_ITEMS', '외출 알림 물건은 20개까지 등록할 수 있어요.');
+      items.forEach(validItemId);
+      return leaveItemList(acknowledged(mode === 'demo' ? await demo.setLeaveItems(items) : await request('/api/leave-items', { method: 'POST', body: { items } })));
     },
     snapshotUrl(record) {
       if (record.snapshot === null) return null;

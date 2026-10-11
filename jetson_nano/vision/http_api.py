@@ -15,6 +15,7 @@ from urllib.parse import unquote, urlsplit
 
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenRecord, LastSeenStore
+from record.leave_items import LeaveItems
 from vision.aim_mapper import AimMapper
 
 
@@ -43,10 +44,12 @@ class RetraceHttpServer:
         drawer_target: str = "DRAWER",
         buzzer_target: str = "TOKEN",
         laser_seconds: float = 5.0,
+        leave_items: LeaveItems | None = None,
     ) -> None:
         if not 0 < laser_seconds <= 5.0:
             raise ValueError("RETRACE_LASER_SECONDS must be in (0, 5]")
         self.storage = storage
+        self.leave_items = leave_items
         self.stm32 = stm32
         self.mapper = mapper
         self.web_root = Path(web_root).resolve()
@@ -69,6 +72,7 @@ class RetraceHttpServer:
         stm32: Stm32Link,
         mapper: AimMapper,
         web_root: Path,
+        leave_items: LeaveItems | None = None,
     ) -> "RetraceHttpServer":
         return cls(
             storage,
@@ -80,6 +84,7 @@ class RetraceHttpServer:
             drawer_target=os.environ.get("RETRACE_DRAWER_CLIENT_ID", "DRAWER"),
             buzzer_target=os.environ.get("RETRACE_BUZZER_CLIENT_ID", "TOKEN"),
             laser_seconds=float(os.environ.get("RETRACE_LASER_SECONDS", "5.0")),
+            leave_items=leave_items,
         )
 
     @property
@@ -170,6 +175,9 @@ class RetraceHttpServer:
                 {"items": [asdict(record) for record in self.storage.list_items()]},
             )
             return
+        if path == "/api/leave-items":
+            self._send_json(request, HTTPStatus.OK, {"items": self._leave_items().get()})
+            return
         if path.startswith("/api/items/"):
             item = path[len("/api/items/"):]
             self._validate_item(item)
@@ -186,6 +194,18 @@ class RetraceHttpServer:
 
     def _handle_post(self, request: BaseHTTPRequestHandler) -> None:
         path = unquote(urlsplit(request.path).path)
+        if path == "/api/leave-items":
+            body = self._read_json_object(request)
+            if set(body) != {"items"}:
+                raise HttpApiError(
+                    HTTPStatus.BAD_REQUEST,
+                    "INVALID_LEAVE_ITEMS",
+                    "items 목록이 필요합니다.",
+                )
+            items = self._leave_items().set(body["items"])
+            self._send_json(request, HTTPStatus.OK, {"ok": True, "items": items})
+            return
+
         if path.startswith("/api/items/") and path.endswith("/aim"):
             item = path[len("/api/items/"):-len("/aim")]
             self._validate_item(item)
@@ -228,6 +248,15 @@ class RetraceHttpServer:
             return
 
         raise HttpApiError(HTTPStatus.NOT_FOUND, "NOT_FOUND", "경로를 찾을 수 없습니다.")
+
+    def _leave_items(self) -> LeaveItems:
+        if self.leave_items is None:
+            raise HttpApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "LEAVE_ITEMS_UNAVAILABLE",
+                "외출 알림 물건 목록을 사용할 수 없습니다.",
+            )
+        return self.leave_items
 
     def _get_item(self, item: str) -> LastSeenRecord:
         try:

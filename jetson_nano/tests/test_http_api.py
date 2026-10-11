@@ -18,6 +18,7 @@ if "serial" not in sys.modules:
     sys.modules["serial"] = serial_stub
 
 from record.last_seen import LastSeenError, LastSeenRecord, LastSeenStore
+from record.leave_items import LeaveItems
 from vision.aim_mapper import AimMapper
 from vision.http_api import RetraceHttpServer
 
@@ -87,6 +88,7 @@ class HttpApiTest(unittest.TestCase):
             host="127.0.0.1",
             port=0,
             laser_seconds=5.0,
+            leave_items=LeaveItems(root / "data" / "leave_items.json"),
         )
         self.server.start()
         host, port = self.server.address
@@ -126,6 +128,17 @@ class HttpApiTest(unittest.TestCase):
             self.store.commands,
             [("DRAWER", "OPEN:6"), ("TOKEN", "BUZZER:1"), ("TOKEN", "BUZZER:0")],
         )
+
+    def test_leave_items_are_saved_and_validated(self) -> None:
+        self.assertEqual(self.request("/api/leave-items"), (200, {"items": []}))
+        self.assertEqual(
+            self.request("/api/leave-items", {"items": ["wallet", "keyboard"]}),
+            (200, {"ok": True, "items": ["wallet", "keyboard"]}),
+        )
+        self.assertEqual(self.request("/api/leave-items"), (200, {"items": ["wallet", "keyboard"]}))
+        with self.assertRaises(HTTPError) as caught:
+            self.request("/api/leave-items", {"items": ["Bad ID"]})
+        self.assertEqual(caught.exception.code, 400)
 
     def test_snapshot_and_static_web_are_served(self) -> None:
         with urlopen(self.base_url + "/", timeout=2) as response:

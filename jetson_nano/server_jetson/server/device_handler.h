@@ -6,7 +6,8 @@
 /*
  * Validate and translate supported application SET commands for a device.
  * SET@clientID:OPEN:n and SET@clientID:BUZZER[:1|0] route to clientID and are
- * forwarded with the client ID preserved.
+ * forwarded with the client ID preserved. SET@clientID:LIGHT:ALERT|NORMAL
+ * routes to clientID and is forwarded as the bare ALERT or NORMAL command.
  * Returns 1 for a translated SET, 0 when payload is not a SET command, or -1
  * for an invalid/unsupported SET.
  */

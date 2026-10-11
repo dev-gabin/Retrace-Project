@@ -4,11 +4,15 @@ import time
 
 import cv2
 
+from communication.phone_notifier import PhoneNotifier, PhoneNotifierError
+from communication.server_events import ServerEventError, ServerEventListener
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenStore
+from record.leave_items import LeaveItems
 from vision.aim_mapper import AimMapper
 from vision.detector import YoloDetector
 from vision.http_api import RetraceHttpServer
+from vision.leave_alert import DeviceEventHandler, LeaveVerifier
 from vision.object_tracker import StableObjectTracker
 
 
@@ -78,6 +82,7 @@ def main() -> None:
         return
 
     frame_height, frame_width = warmup_frame.shape[:2]
+    leave_items = LeaveItems(storage.data_dir / "leave_items.json")
     try:
         mapper = AimMapper.from_env(frame_width, frame_height)
         http_server = RetraceHttpServer.from_env(
@@ -85,6 +90,7 @@ def main() -> None:
             stm32,
             mapper,
             REPOSITORY_DIR / "web",
+            leave_items,
         )
         http_server.start()
     except (OSError, ValueError) as error:
@@ -96,6 +102,27 @@ def main() -> None:
 
     http_host, http_port = http_server.address
     print(f"[HTTP] http://{http_host}:{http_port}")
+
+    # 현관 PIR·SOS 이벤트와 ntfy 알림은 설정이 없으면 끄고 나머지 기능은 계속 동작한다.
+    notifier = None
+    event_listener = None
+    event_handler = None
+    leave_verifier = None
+    try:
+        notifier = PhoneNotifier.from_env()
+        if notifier is None:
+            print("[NTFY] RETRACE_NTFY_TOPIC 없음; 폰 알림 끔")
+        else:
+            notifier.start()
+        event_listener = ServerEventListener.from_env()
+        event_listener.start()
+        leave_verifier = LeaveVerifier.from_env()
+        event_handler = DeviceEventHandler.from_env(
+            storage, stm32, mapper, notifier, leave_items, leave_verifier
+        )
+    except (PhoneNotifierError, ServerEventError, ValueError) as error:
+        print(f"[EVENT] 현관·SOS 이벤트 처리 끔: {error}")
+        event_listener = None
 
     state = "IDLE"
     pir_high = False
@@ -126,11 +153,23 @@ def main() -> None:
                 elif event == "EVT@PIR:0":
                     pir_high = False
 
-            if state == "IDLE":
+            while event_listener is not None and event_handler is not None:
+                device_event = event_listener.get_event(timeout=0)
+                if device_event is None:
+                    break
+                event_handler.handle(device_event)
+
+            should_verify_leave = leave_verifier is not None and leave_verifier.active()
+            if state == "IDLE" and not should_verify_leave:
                 continue
 
             now = time.monotonic()
             detections = detector.detect(frame)
+            if leave_verifier is not None:
+                leave_verifier.observe(detections)
+
+            if state == "IDLE":
+                continue
             person_confidence = max(
                 (
                     detection["confidence"]
@@ -216,6 +255,10 @@ def main() -> None:
         camera.release()
         if http_server is not None:
             http_server.close()
+        if event_listener is not None:
+            event_listener.close()
+        if notifier is not None:
+            notifier.close()
         try:
             stm32.laser(False)
         except Stm32LinkError:
