@@ -105,6 +105,7 @@ class Stm32Link:
             time.sleep(on_seconds)
         finally:
             self.laser(False)
+            self.home()
 
     def get_event(self, timeout: float | None = None) -> str | None:
         try:
