@@ -262,6 +262,11 @@ class RetraceHttpServer:
         return self.leave_items
 
     def _get_item(self, item: str) -> LastSeenRecord:
+        # Custom drawer items are stored locally, not registered with YOLO's DB.
+        # Read their assignment directly instead of querying a camera-only backend.
+        with self.drawer_items.lock:
+            if item.startswith("custom_") and item in self.drawer_items.entries:
+                return self.drawer_items.apply(self._unseen_item(item))
         try:
             return self.drawer_items.apply(self.storage.get_item(item))
         except LastSeenError as error:

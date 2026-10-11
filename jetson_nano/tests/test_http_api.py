@@ -249,6 +249,46 @@ class ManualDrawerTest(unittest.TestCase):
         self.assertIsNone(self.body["drawer_id"])
         self.assertIsNone(self.body["pos_x"])
 
+    def test_custom_item_lookup_does_not_require_camera_db(self):
+        self.post("/api/drawer-items", {"name": "여권", "drawer_id": 3})
+        item = self.body["item"]
+        calls = []
+
+        def reject_custom_id(value):
+            calls.append(value)
+            raise LastSeenError("ERR@GET:Invalid item ID")
+
+        self.store.get_item = reject_custom_id
+        self.server._handle_get(types.SimpleNamespace(path=f"/api/items/{item}"))
+        self.assertEqual(self.body["item"], item)
+        self.assertEqual(self.body["display_name"], "여권")
+        self.assertEqual(self.body["drawer_id"], 3)
+        self.assertIsNone(self.body["snapshot"])
+        self.assertEqual(calls, [])
+
+        self.post("/api/drawers/3/open", {})
+        self.server._handle_get(types.SimpleNamespace(path=f"/api/items/{item}"))
+        self.assertEqual(self.body["display_name"], "여권")
+        self.assertIsNone(self.body["drawer_id"])
+        self.assertIsNone(self.body["seen_at"])
+        self.assertEqual(calls, [])
+
+    def test_empty_drawer_can_open_without_registered_items(self):
+        self.store.records.clear()
+        for drawer in range(1, 7):
+            self.post(f"/api/drawers/{drawer}/open", {})
+            self.assertEqual(self.body, {"ok": True})
+        self.assertEqual(self.store.commands, [("DRAWER", f"OPEN:{n}") for n in range(1, 7)])
+        self.assertEqual(self.server.drawer_items.entries, {})
+
+    def test_camera_item_backend_errors_are_not_hidden(self):
+        def fail(value):
+            raise LastSeenError("ERR@GET:database unavailable")
+
+        self.store.get_item = fail
+        with self.assertRaisesRegex(LastSeenError, "database unavailable"):
+            self.server._get_item("keyboard")
+
     def test_custom_input_is_validated(self):
         for name in ["", "  ", None, "x" * 41, "여\x00권"]:
             with self.subTest(name=name), self.assertRaises(ValueError):

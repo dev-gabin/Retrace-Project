@@ -80,7 +80,7 @@
       <aside class="controls-column" aria-label="찾기 도구">
         <section class="tool-card drawer-card" id="drawer" aria-labelledby="drawer-title">
           <div class="tool-title"><span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#icon-drawer"/></svg></span><div><p class="eyebrow">SMART DRAWER</p><h2 id="drawer-title">서랍에서 찾기</h2></div></div>
-          <p class="tool-copy">찾고 싶은 서랍을 선택해 살짝 열어보세요.</p>
+          <p class="tool-copy">물건 등록 없이도 서랍 번호를 선택해 열 수 있어요.</p>
           <div class="drawer-orientation" aria-hidden="true"><span>왼쪽</span><span>오른쪽</span></div>
           <div class="drawer-grid" aria-label="서랍 번호 선택">
             <button type="button" class="drawer-cell is-selected" data-drawer="1" aria-pressed="true" aria-label="1번 서랍, 상단 왼쪽"><span>01</span><i></i></button>
@@ -90,7 +90,8 @@
             <button type="button" class="drawer-cell" data-drawer="5" aria-pressed="false" aria-label="5번 서랍, 하단 왼쪽"><span>05</span><i></i></button>
             <button type="button" class="drawer-cell" data-drawer="6" aria-pressed="false" aria-label="6번 서랍, 하단 오른쪽"><span>06</span><i></i></button>
           </div>
-          <label class="visually-hidden" for="drawer-item-select">보관할 물건 선택</label>
+          <button id="drawer-open-button" class="button button-secondary full-width" type="button"><span>1번 서랍 열기</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+          <label class="drawer-storage-label" for="drawer-item-select">물건 보관 등록</label>
           <select id="drawer-item-select" aria-label="보관할 물건 선택"></select>
           <div class="drawer-custom-controls">
             <label class="visually-hidden" for="drawer-custom-name">목록에 없는 물건 이름</label>
@@ -98,7 +99,6 @@
             <button id="drawer-custom-add-button" class="button button-secondary" type="button" disabled>추가·보관</button>
           </div>
           <div class="drawer-actions">
-            <button id="drawer-open-button" class="button button-secondary full-width" type="button"><span>1번 서랍 열기</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
             <button id="drawer-store-button" class="button button-primary" type="button" disabled>보관 등록</button>
           </div>
           <p class="tool-footnote">서랍은 자동으로 닫히지 않아요.</p>
