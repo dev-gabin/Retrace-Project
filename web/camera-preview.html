@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172b4d">
+  <title>Retrace 카메라 확인</title>
+  <link rel="stylesheet" href="./camera-preview.css">
+  <script defer src="./camera-preview.js"></script>
+</head>
+<body>
+  <main class="preview-page">
+    <header>
+      <p>RETRACE CAMERA CHECK</p>
+      <h1>카메라 확인</h1>
+      <span id="preview-status" role="status">카메라 프레임을 기다리는 중</span>
+    </header>
+    <section class="preview-card" aria-label="실시간 카메라 미리보기">
+      <img id="preview-image" alt="젯슨 카메라 실시간 미리보기">
+    </section>
+    <p class="help">카메라 위치와 추론 결과를 확인하는 테스트 화면입니다. 박스와 이름은 PIR 감지 후 YOLO 추론 중일 때 표시됩니다.</p>
+  </main>
+</body>
+</html>

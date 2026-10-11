@@ -26,6 +26,7 @@ IMAGE_SIZE = 640
 PERSON_ENTER_CONFIDENCE = 0.55
 PERSON_KEEP_CONFIDENCE = 0.40
 PERSON_GRACE_SECONDS = 10.0
+CAMERA_PREVIEW_INTERVAL_SECONDS = 0.25
 
 
 def main() -> None:
@@ -129,6 +130,7 @@ def main() -> None:
     state_started = time.monotonic()
     last_person_seen: float | None = None
     person_window: deque[bool] = deque(maxlen=5)
+    next_camera_preview_at = 0.0
 
     print("[START] PIR-triggered Jetson YOLO mode (Ctrl+C: 종료)")
 
@@ -161,12 +163,45 @@ def main() -> None:
 
             should_verify_leave = leave_verifier is not None and leave_verifier.active()
             if state == "IDLE" and not should_verify_leave:
+                preview_now = time.monotonic()
+                if preview_now >= next_camera_preview_at:
+                    encoded, preview = cv2.imencode(
+                        ".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 70]
+                    )
+                    if encoded:
+                        http_server.set_camera_preview(preview.tobytes())
+                    next_camera_preview_at = (
+                        preview_now + CAMERA_PREVIEW_INTERVAL_SECONDS
+                    )
                 continue
 
             now = time.monotonic()
             detections = detector.detect(frame)
             if leave_verifier is not None:
                 leave_verifier.observe(detections)
+
+            preview_now = time.monotonic()
+            if preview_now >= next_camera_preview_at:
+                preview_frame = frame.copy()
+                for detection in detections:
+                    x1, y1, x2, y2 = detection["bbox"]
+                    cv2.rectangle(preview_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(
+                        preview_frame,
+                        f"{detection['name']} {detection['confidence']:.2f}",
+                        (x1, max(y1 - 10, 20)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.6,
+                        (0, 255, 0),
+                        2,
+                        cv2.LINE_AA,
+                    )
+                encoded, preview = cv2.imencode(
+                    ".jpg", preview_frame, [cv2.IMWRITE_JPEG_QUALITY, 70]
+                )
+                if encoded:
+                    http_server.set_camera_preview(preview.tobytes())
+                next_camera_preview_at = preview_now + CAMERA_PREVIEW_INTERVAL_SECONDS
 
             if state == "IDLE":
                 continue

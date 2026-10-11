@@ -149,6 +149,16 @@ class HttpApiTest(unittest.TestCase):
             urlopen(self.base_url + "/snapshots/%2e%2e/index.html", timeout=2)
         self.assertEqual(caught.exception.code, 400)
 
+    def test_camera_preview_serves_latest_frame(self) -> None:
+        with self.assertRaises(HTTPError) as caught:
+            urlopen(self.base_url + "/api/camera-preview.jpg", timeout=2)
+        self.assertEqual(caught.exception.code, 503)
+
+        self.server.set_camera_preview(b"jpeg-preview")
+        with urlopen(self.base_url + "/api/camera-preview.jpg", timeout=2) as response:
+            self.assertEqual(response.headers.get_content_type(), "image/jpeg")
+            self.assertEqual(response.read(), b"jpeg-preview")
+
     def test_item_without_coordinates_returns_conflict(self) -> None:
         with self.assertRaises(HTTPError) as caught:
             self.request("/api/items/wallet/aim", {})

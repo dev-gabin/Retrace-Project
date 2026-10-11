@@ -56,6 +56,8 @@ class RetraceHttpServer:
         self.drawer_target = drawer_target
         self.buzzer_target = buzzer_target
         self.laser_seconds = laser_seconds
+        self._camera_preview: bytes | None = None
+        self._camera_preview_lock = threading.Lock()
         handler = self._make_handler()
         self._server = ThreadingHTTPServer((host, port), handler)
         self._server.daemon_threads = True
@@ -99,6 +101,11 @@ class RetraceHttpServer:
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=2.0)
+
+    def set_camera_preview(self, jpeg: bytes) -> None:
+        """Publish the latest camera JPEG for the web preview."""
+        with self._camera_preview_lock:
+            self._camera_preview = jpeg
 
     def _make_handler(self) -> type[BaseHTTPRequestHandler]:
         owner = self
@@ -177,6 +184,9 @@ class RetraceHttpServer:
             return
         if path == "/api/leave-items":
             self._send_json(request, HTTPStatus.OK, {"items": self._leave_items().get()})
+            return
+        if path == "/api/camera-preview.jpg":
+            self._send_camera_preview(request)
             return
         if path.startswith("/api/items/"):
             item = path[len("/api/items/"):]
@@ -282,6 +292,22 @@ class RetraceHttpServer:
                 HTTPStatus.BAD_REQUEST, "INVALID_PATH", "잘못된 사진 경로입니다."
             ) from error
         self._send_file(request, candidate)
+
+    def _send_camera_preview(self, request: BaseHTTPRequestHandler) -> None:
+        with self._camera_preview_lock:
+            preview = self._camera_preview
+        if preview is None:
+            raise HttpApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "CAMERA_UNAVAILABLE",
+                "카메라 프레임을 기다리는 중입니다.",
+            )
+        request.send_response(HTTPStatus.OK)
+        request.send_header("Content-Type", "image/jpeg")
+        request.send_header("Content-Length", str(len(preview)))
+        request.send_header("Cache-Control", "no-store")
+        request.end_headers()
+        request.wfile.write(preview)
 
     def _send_web_file(self, request: BaseHTTPRequestHandler, path: str) -> None:
         relative = "index.html" if path == "/" else path.lstrip("/")
