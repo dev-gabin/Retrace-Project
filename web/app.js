@@ -7,16 +7,12 @@ const labels = { car_key: '차키', carkey: '차키', airpods: '에어팟', earp
 const icons = { car_key: 'key', carkey: 'key', airpods: 'airpods', earphones: 'airpods', wallet: 'wallet' };
 const descriptions = { car_key: '외출할 때 함께', carkey: '외출할 때 함께', airpods: '나만의 작은 음악', earphones: '나만의 작은 음악', wallet: '외출할 때 챙기는 지갑' };
 const stateLabels = { visible: '마지막 화면에서 확인', occluded: '가려진 상태로 기록', uncertain: '위치 확인 필요' };
-const modelItems = [
-  'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic_light',
-  'fire_hydrant', 'stop_sign', 'parking_meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-  'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-  'skis', 'snowboard', 'sports_ball', 'kite', 'baseball_bat', 'baseball_glove', 'skateboard', 'surfboard',
-  'tennis_racket', 'bottle', 'wine_glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-  'sandwich', 'orange', 'broccoli', 'carrot', 'hot_dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-  'potted_plant', 'bed', 'dining_table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
-  'cell_phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
-  'teddy_bear', 'hair_drier', 'toothbrush', 'car_key', 'wallet', 'earphones',
+// Leave checks are for things a person may carry out, not every class YOLO can detect.
+const leaveItemChoices = [
+  'car_key', 'wallet', 'earphones', 'cell_phone',
+  'backpack', 'umbrella', 'handbag', 'suitcase',
+  'laptop', 'mouse', 'remote', 'keyboard', 'book',
+  'bottle', 'cup',
 ];
 const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [], leaveItems: new Set() };
 const $ = id => document.getElementById(id);
@@ -81,7 +77,7 @@ function renderLeaveRegistration() {
   const select = $('leave-item-select');
   const current = select.value;
   const fragment = document.createDocumentFragment();
-  for (const item of modelItems) {
+  for (const item of leaveItemChoices) {
     const option = document.createElement('option');
     option.value = item;
     option.textContent = leaveItemLabel(item);
@@ -89,10 +85,10 @@ function renderLeaveRegistration() {
     fragment.append(option);
   }
   select.replaceChildren(fragment);
-  select.value = modelItems.includes(current) && !state.leaveItems.has(current) ? current : modelItems.find(item => !state.leaveItems.has(item)) ?? '';
+  select.value = leaveItemChoices.includes(current) && !state.leaveItems.has(current) ? current : leaveItemChoices.find(item => !state.leaveItems.has(item)) ?? '';
   $('leave-item-add-button').disabled = !select.value || state.busy.has('leave');
 
-  const registered = [...state.leaveItems].sort((a, b) => modelItems.indexOf(a) - modelItems.indexOf(b));
+  const registered = [...state.leaveItems].sort((a, b) => leaveItemChoices.indexOf(a) - leaveItemChoices.indexOf(b));
   const list = $('leave-item-list');
   if (!registered.length) {
     list.textContent = '등록된 외출 확인 물건이 없어요.';
