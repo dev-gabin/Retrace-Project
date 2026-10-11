@@ -5,6 +5,66 @@ import { createApi, validateItem, ApiError } from '../api.js';
 const record = (item = 'carkey') => ({ item, pos_x: 412, pos_y: 288, seen_at: '2026-10-03T14:22:05+09:00', snapshot: 'snapshots/key.jpg', drawer_id: null, state: 'visible' });
 const reply = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => structuredClone(data) });
 const hasCode = code => error => error instanceof ApiError && error.code === code;
+test('직접 입력한 물건 이름은 보관·이동·해제 후에도 유지한다', async () => {
+  const api = createApi();
+  const added = await api.createDrawerItem('  여권  ', 3);
+  assert.match(added.item, /^custom_[a-f0-9]{24}$/);
+  let item = await api.getItem(added.item);
+  assert.equal(item.display_name, '여권');
+  assert.equal(item.drawer_id, 3);
+  const same = await api.createDrawerItem('여권', 4);
+  assert.equal(same.item, added.item);
+  assert.equal((await api.listItems()).filter(record => record.display_name === '여권').length, 1);
+  await api.storeDrawer(added.item, 2);
+  assert.equal((await api.getItem(added.item)).display_name, '여권');
+  await api.openDrawer(2);
+  item = await api.getItem(added.item);
+  assert.equal(item.display_name, '여권');
+  assert.equal(item.drawer_id, null);
+  assert.equal(item.pos_x, null);
+});
+
+test('직접 입력한 이름의 요청·응답 및 잘못된 입력 검증', async () => {
+  const result = { ok: true, item: 'custom_1234567890abcdef12345678', display_name: '여권' };
+  const { api, calls } = liveWith(result);
+  assert.deepEqual(await api.createDrawerItem('여권', 1), result);
+  assert.equal(calls[0].url, 'http://jetson.local:8080/api/drawer-items');
+  assert.equal(calls[0].body, '{"name":"여권","drawer_id":1}');
+  for (const name of ['', '  ', null, 'x'.repeat(41), '여\u0000권']) await assert.rejects(api.createDrawerItem(name, 1), hasCode('INVALID_NAME'));
+  for (const n of [0, 7, true, '1']) await assert.rejects(api.createDrawerItem('여권', n), hasCode('INVALID_DRAWER'));
+  assert.equal(calls.length, 1);
+  const invalid = liveWith({ ok: true, item: 'wallet', display_name: '다른 이름' }).api;
+  await assert.rejects(invalid.createDrawerItem('여권', 1), hasCode('BAD_RESPONSE'));
+  assert.deepEqual(validateItem({ ...record(), display_name: '여권' }).display_name, '여권');
+});
+
+test('미목격 물건도 서랍에 등록하고 해당 서랍 열기로 해제한다', async () => {
+  const api = createApi();
+  await api.storeDrawer('umbrella', 1);
+  await api.storeDrawer('backpack', 1);
+  await api.storeDrawer('book', 2);
+  assert.equal((await api.getItem('umbrella')).drawer_id, 1);
+  assert.equal((await api.listItems()).filter(item => item.drawer_id === 1).length, 2);
+  await api.openDrawer(1);
+  for (const item of ['umbrella', 'backpack']) {
+    const released = await api.getItem(item);
+    assert.equal(released.drawer_id, null);
+    assert.equal(released.pos_x, null);
+    assert.equal(released.seen_at, null);
+  }
+  assert.equal((await api.getItem('book')).drawer_id, 2);
+});
+
+test('보관 등록 요청 형식과 잘못된 값 검증', async () => {
+  const { api, calls } = liveWith({ ok: true });
+  await api.storeDrawer('umbrella', 6);
+  assert.equal(calls[0].url, 'http://jetson.local:8080/api/items/umbrella/drawer');
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[0].body, '{"drawer_id":6}');
+  for (const item of ['../umbrella', '', null]) await assert.rejects(api.storeDrawer(item, 1), hasCode('INVALID_ITEM'));
+  for (const n of [0, 7, true, '1']) await assert.rejects(api.storeDrawer('umbrella', n), hasCode('INVALID_DRAWER'));
+  assert.equal(calls.length, 1);
+});
 function liveWith(data, status = 200) {
   const calls = [];
   const api = createApi({ mode: 'live', apiBaseUrl: 'http://jetson.local:8080/', fetchImpl: async (url, options) => {

@@ -16,6 +16,7 @@ from urllib.parse import unquote, urlsplit
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenRecord, LastSeenStore
 from record.leave_items import LeaveItems
+from record.drawer_items import DrawerItems
 from vision.aim_mapper import AimMapper
 
 
@@ -49,6 +50,7 @@ class RetraceHttpServer:
         if not 0 < laser_seconds <= 5.0:
             raise ValueError("RETRACE_LASER_SECONDS must be in (0, 5]")
         self.storage = storage
+        self.drawer_items = DrawerItems(storage.data_dir / "drawer_items.json")
         self.leave_items = leave_items
         self.stm32 = stm32
         self.mapper = mapper
@@ -169,11 +171,12 @@ class RetraceHttpServer:
     def _handle_get(self, request: BaseHTTPRequestHandler) -> None:
         path = unquote(urlsplit(request.path).path)
         if path == "/api/items":
-            self._send_json(
-                request,
-                HTTPStatus.OK,
-                {"items": [asdict(record) for record in self.storage.list_items()]},
-            )
+            records = {record.item: record for record in self.storage.list_items()}
+            with self.drawer_items.lock:
+                for item in self.drawer_items.entries:
+                    records.setdefault(item, self._unseen_item(item))
+                items = [self._item_json(self.drawer_items.apply(record)) for record in records.values()]
+            self._send_json(request, HTTPStatus.OK, {"items": items})
             return
         if path == "/api/leave-items":
             self._send_json(request, HTTPStatus.OK, {"items": self._leave_items().get()})
@@ -184,7 +187,7 @@ class RetraceHttpServer:
             self._send_json(
                 request,
                 HTTPStatus.OK,
-                asdict(self._get_item(item)),
+                self._item_json(self._get_item(item)),
             )
             return
         if path.startswith("/snapshots/"):
@@ -194,6 +197,14 @@ class RetraceHttpServer:
 
     def _handle_post(self, request: BaseHTTPRequestHandler) -> None:
         path = unquote(urlsplit(request.path).path)
+        if path == "/api/drawer-items":
+            body = self._read_json_object(request)
+            if set(body) != {"name", "drawer_id"}:
+                raise ValueError("name과 drawer_id가 필요합니다.")
+            item = self.drawer_items.add_custom(body["name"], body["drawer_id"])
+            self._send_json(request, HTTPStatus.OK, {"ok": True, "item": item,
+                            "display_name": self.drawer_items.display_name(item)})
+            return
         if path == "/api/leave-items":
             body = self._read_json_object(request)
             if set(body) != {"items"}:
@@ -204,6 +215,18 @@ class RetraceHttpServer:
                 )
             items = self._leave_items().set(body["items"])
             self._send_json(request, HTTPStatus.OK, {"ok": True, "items": items})
+            return
+
+        if path.startswith("/api/items/") and path.endswith("/drawer"):
+            item = path[len("/api/items/"):-len("/drawer")]
+            self._validate_item(item)
+            body = self._read_json_object(request)
+            drawer = body.get("drawer_id")
+            if set(body) != {"drawer_id"} or type(drawer) is not int or not 1 <= drawer <= 6:
+                raise ValueError("drawer_id는 1~6이어야 합니다.")
+            with self.drawer_items.lock:
+                self.drawer_items.assign(item, drawer)
+            self._send_json(request, HTTPStatus.OK, {"ok": True})
             return
 
         if path.startswith("/api/items/") and path.endswith("/aim"):
@@ -226,9 +249,9 @@ class RetraceHttpServer:
         if drawer_match is not None:
             self._read_json_object(request, must_be_empty=True)
             drawer = int(drawer_match.group(1))
-            self.storage.send_device_command(
-                self.drawer_target, f"OPEN:{drawer}"
-            )
+            with self.drawer_items.lock:
+                self.storage.send_device_command(self.drawer_target, f"OPEN:{drawer}")
+                self.drawer_items.release(drawer)
             self._send_json(request, HTTPStatus.OK, {"ok": True})
             return
 
@@ -260,15 +283,30 @@ class RetraceHttpServer:
 
     def _get_item(self, item: str) -> LastSeenRecord:
         try:
-            return self.storage.get_item(item)
+            return self.drawer_items.apply(self.storage.get_item(item))
         except LastSeenError as error:
             if "RT_NOT_FOUND" in str(error):
+                with self.drawer_items.lock:
+                    if item in self.drawer_items.entries:
+                        return self.drawer_items.apply(self._unseen_item(item))
                 raise HttpApiError(
                     HTTPStatus.NOT_FOUND,
                     "ITEM_NOT_FOUND",
                     "등록된 물건을 찾을 수 없습니다.",
                 ) from error
             raise
+
+    @staticmethod
+    def _unseen_item(item: str) -> LastSeenRecord:
+        return LastSeenRecord(item=item, pos_x=None, pos_y=None, seen_at=None,
+                              snapshot=None, drawer_id=None, state="uncertain")
+
+    def _item_json(self, record: LastSeenRecord) -> dict:
+        data = asdict(record)
+        name = self.drawer_items.display_name(record.item)
+        if name is not None:
+            data["display_name"] = name
+        return data
 
     def _send_snapshot(self, request: BaseHTTPRequestHandler, relative: str) -> None:
         if not relative.startswith("snapshots/"):

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import io
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sys
 import tempfile
@@ -21,6 +24,7 @@ from record.last_seen import LastSeenError, LastSeenRecord, LastSeenStore
 from record.leave_items import LeaveItems
 from vision.aim_mapper import AimMapper
 from vision.http_api import RetraceHttpServer
+from record.drawer_items import DrawerItems
 
 
 class FakeStore:
@@ -140,6 +144,34 @@ class HttpApiTest(unittest.TestCase):
             self.request("/api/leave-items", {"items": ["Bad ID"]})
         self.assertEqual(caught.exception.code, 400)
 
+    def test_manual_drawer_storage_and_release(self) -> None:
+        self.request("/api/items/keyboard/drawer", {"drawer_id": 1})
+        _, record = self.request("/api/items/keyboard")
+        self.assertEqual(record["drawer_id"], 1)
+        self.assertIsNone(record["pos_x"])
+        with self.assertRaises(HTTPError):
+            self.request("/api/items/keyboard/aim", {})
+        self.assertEqual(self.stm32.points, [])
+        from record.drawer_items import DrawerItems
+        restored = DrawerItems(self.store.data_dir / "drawer_items.json")
+        self.assertEqual(restored.apply(self.store.records["keyboard"]).drawer_id, 1)
+        self.request("/api/drawers/1/open", {})
+        _, record = self.request("/api/items/keyboard")
+        self.assertIsNone(record["drawer_id"])
+        self.assertIsNone(record["pos_x"])
+        self.assertIsNone(record["seen_at"])
+        self.assertEqual(self.store.commands, [("DRAWER", "OPEN:1")])
+
+    def test_failed_open_preserves_storage(self) -> None:
+        self.request("/api/items/wallet/drawer", {"drawer_id": 2})
+        def fail(*args):
+            raise LastSeenError("offline")
+        self.store.send_device_command = fail
+        with self.assertRaises(HTTPError):
+            self.request("/api/drawers/2/open", {})
+        _, record = self.request("/api/items/wallet")
+        self.assertEqual(record["drawer_id"], 2)
+
     def test_snapshot_and_static_web_are_served(self) -> None:
         with urlopen(self.base_url + "/", timeout=2) as response:
             self.assertEqual(response.read(), b"Retrace test")
@@ -162,6 +194,90 @@ class HttpApiTest(unittest.TestCase):
         self.assertEqual(caught.exception.code, 404)
         error = json.load(caught.exception)
         self.assertEqual(error["error"]["code"], "ITEM_NOT_FOUND")
+
+
+class ManualDrawerTest(unittest.TestCase):
+    """Exercise request handling and persistence without a network socket."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.store = FakeStore(Path(self.temporary.name))
+        self.server = RetraceHttpServer.__new__(RetraceHttpServer)
+        self.server.storage = self.store
+        self.server.drawer_target = "DRAWER"
+        self.server.drawer_items = DrawerItems(self.store.data_dir / "drawer_items.json")
+        self.body = None
+        self.server._send_json = lambda request, status, body: setattr(self, "body", body)
+
+    def tearDown(self):
+        self.temporary.cleanup()
+
+    def post(self, path, body):
+        data = json.dumps(body).encode()
+        self.server._handle_post(types.SimpleNamespace(path=path, headers={"Content-Length": str(len(data))}, rfile=io.BytesIO(data)))
+
+
+    def test_unseen_storage_listing_and_persistence(self):
+        self.post("/api/items/umbrella/drawer", {"drawer_id": 1})
+        self.assertEqual(self.server._get_item("umbrella").drawer_id, 1)
+        self.server._handle_get(types.SimpleNamespace(path="/api/items"))
+        self.assertIn("umbrella", [record["item"] for record in self.body["items"]])
+        self.server.drawer_items = DrawerItems(self.server.drawer_items.path)
+        self.assertEqual(self.server._get_item("umbrella").drawer_id, 1)
+
+    def test_custom_name_persists_moves_and_releases(self):
+        self.post("/api/drawer-items", {"name": "  여권  ", "drawer_id": 3})
+        item = self.body["item"]
+        self.assertRegex(item, r"^custom_[0-9a-f]{24}$")
+        self.server.drawer_items = DrawerItems(self.server.drawer_items.path)
+        self.server._handle_get(types.SimpleNamespace(path=f"/api/items/{item}"))
+        self.assertEqual(self.body["display_name"], "여권")
+        self.assertEqual(self.body["drawer_id"], 3)
+        self.post("/api/drawer-items", {"name": "여권", "drawer_id": 4})
+        self.assertEqual(self.body["item"], item)
+        self.assertEqual(len(self.server.drawer_items.entries), 1)
+        self.post(f"/api/items/{item}/drawer", {"drawer_id": 2})
+        self.post("/api/drawers/2/open", {})
+        self.server._handle_get(types.SimpleNamespace(path=f"/api/items/{item}"))
+        self.assertEqual(self.body["display_name"], "여권")
+        self.assertIsNone(self.body["drawer_id"])
+        self.assertIsNone(self.body["pos_x"])
+
+    def test_custom_input_is_validated(self):
+        for name in ["", "  ", None, "x" * 41, "여\x00권"]:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                self.post("/api/drawer-items", {"name": name, "drawer_id": 1})
+        for n in [0, 7, True, "1"]:
+            with self.subTest(drawer=n), self.assertRaises(ValueError):
+                self.post("/api/drawer-items", {"name": "여권", "drawer_id": n})
+        self.assertEqual(self.server.drawer_items.entries, {})
+
+    def test_open_releases_all_items_in_only_that_drawer(self):
+        for item, n in [("umbrella", 1), ("book", 1), ("wallet", 2)]:
+            self.post(f"/api/items/{item}/drawer", {"drawer_id": n})
+        self.post("/api/drawers/1/open", {})
+        for item in ["umbrella", "book"]:
+            record = self.server._get_item(item)
+            self.assertIsNone(record.drawer_id)
+            self.assertIsNone(record.pos_x)
+        self.assertEqual(self.server._get_item("wallet").drawer_id, 2)
+        self.assertEqual(self.store.commands, [("DRAWER", "OPEN:1")])
+
+    def test_failed_open_keeps_registration(self):
+        self.post("/api/items/umbrella/drawer", {"drawer_id": 1})
+        def fail(*args):
+            raise LastSeenError("offline")
+        self.store.send_device_command = fail
+        with self.assertRaises(LastSeenError):
+            self.post("/api/drawers/1/open", {})
+        self.assertEqual(self.server._get_item("umbrella").drawer_id, 1)
+
+    def test_released_coordinates_require_new_camera_observation(self):
+        self.post("/api/items/keyboard/drawer", {"drawer_id": 1})
+        self.post("/api/drawers/1/open", {})
+        self.assertIsNone(self.server._get_item("keyboard").pos_x)
+        self.store.records["keyboard"] = replace(self.store.records["keyboard"], seen_at=(datetime.now(timezone.utc) + timedelta(seconds=1)).isoformat())
+        self.assertEqual(self.server._get_item("keyboard").pos_x, 320)
 
 
 class RecordParsingTest(unittest.TestCase):

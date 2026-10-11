@@ -14,12 +14,16 @@ const leaveItemChoices = [
   'laptop', 'mouse', 'remote', 'keyboard', 'book',
   'bottle', 'cup',
 ];
+// Keep the default drawer choices to small objects; custom names remain available.
+const drawerItemChoices = [
+  'car_key', 'wallet', 'earphones', 'cell_phone', 'mouse', 'remote',
+];
 const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [], leaveItems: new Set() };
 const $ = id => document.getElementById(id);
 let toastTimer;
 
 function itemLabel(item) {
-  return labels[item] ?? item.replaceAll('_', ' ');
+  return state.items.find(record => record.item === item)?.display_name ?? labels[item] ?? item.replaceAll('_', ' ');
 }
 
 function itemIcon(item) {
@@ -27,6 +31,7 @@ function itemIcon(item) {
 }
 
 function itemDescription(item) {
+  if (state.items.find(record => record.item === item)?.display_name) return '직접 등록한 보관 물건';
   return descriptions[item] ?? '마지막으로 확인된 물건';
 }
 
@@ -119,6 +124,21 @@ function setLeaveItems(items, description) {
   renderLeaveRegistration();
 }
 
+function renderDrawerItems() {
+  const select = $('drawer-item-select');
+  const current = select.value;
+  const fragment = document.createDocumentFragment();
+  const customItems = state.items.filter(record => record.display_name).map(record => record.item);
+  for (const item of [...new Set([...drawerItemChoices, ...customItems])]) {
+    const option = document.createElement('option');
+    option.value = item;
+    option.textContent = customItems.includes(item) ? itemLabel(item) : leaveItemLabel(item);
+    fragment.append(option);
+  }
+  select.replaceChildren(fragment);
+  if ([...select.options].some(option => option.value === current)) select.value = current;
+}
+
 function renderItems() {
   const focusedItem = $('item-list').contains(document.activeElement) ? document.activeElement.dataset.item : null;
   const query = $('search-input').value.trim().toLocaleLowerCase('ko-KR');
@@ -136,7 +156,7 @@ function renderItems() {
     holder.className = 'item-icon';
     holder.append(icon(itemIcon(record.item)));
     button.append(holder);
-    for (const [className, text] of [['item-name', itemLabel(record.item)], ['item-description', itemDescription(record.item)], ['item-time', relativeTime(record.seen_at)]]) {
+    for (const [className, text] of [['item-name', itemLabel(record.item)], ['item-description', itemDescription(record.item)], ['item-time', record.drawer_id !== null ? `${record.drawer_id}번 서랍 보관 중` : relativeTime(record.seen_at)]]) {
       const span = document.createElement('span');
       span.className = className;
       span.textContent = text;
@@ -148,7 +168,7 @@ function renderItems() {
       badge.textContent = '외출 알림';
       button.append(badge);
     }
-    button.addEventListener('click', () => selectItem(record.item));
+    button.addEventListener('click', () => selectItem(record.item, { navigateToDrawer: true }));
     fragment.append(button);
   }
   $('item-list').replaceChildren(fragment);
@@ -160,6 +180,14 @@ function updateButtons() {
   const record = state.record;
   $('aim-button').disabled = state.detailLoading || !record || record.seen_at === null || record.pos_x === null || record.drawer_id !== null || state.busy.has('aim');
   $('drawer-open-button').disabled = state.busy.has('drawer');
+  const storageItem = $('drawer-item-select').value;
+  $('drawer-item-select').disabled = state.busy.has('drawer');
+  $('drawer-custom-name').disabled = state.busy.has('drawer');
+  $('drawer-custom-add-button').disabled = !$('drawer-custom-name').value.trim() || state.busy.has('drawer');
+  $('drawer-store-button').disabled = !storageItem || state.busy.has('drawer');
+  const storageLabel = storageItem ? `${itemLabel(storageItem)}을 ${state.drawer}번 서랍에 보관 등록` : '보관할 물건을 선택해 주세요';
+  $('drawer-store-button').setAttribute('aria-label', storageLabel);
+  $('drawer-store-button').title = storageLabel;
   $('buzzer-on-button').disabled = state.busy.has('buzzer');
   $('buzzer-off-button').disabled = state.busy.has('buzzer');
 }
@@ -219,7 +247,7 @@ function renderDetail() {
   updateButtons();
 }
 
-async function selectItem(item) {
+async function selectItem(item, { navigateToDrawer = false } = {}) {
   const sequence = ++state.detailSequence;
   state.selected = item;
   state.record = null;
@@ -235,7 +263,11 @@ async function selectItem(item) {
     if (sequence !== state.detailSequence) return;
     showError(`상세 기록을 불러오지 못했어요. ${error.message}`);
   } finally {
-    if (sequence === state.detailSequence) { state.detailLoading = false; renderDetail(); }
+    if (sequence === state.detailSequence) {
+      state.detailLoading = false;
+      renderDetail();
+      if (navigateToDrawer && state.record && state.record.drawer_id !== null) showItemDrawer(state.record);
+    }
   }
 }
 
@@ -246,6 +278,7 @@ async function refreshItems() {
   try {
     const [items, leaveItems] = await Promise.all([api.listItems(), api.getLeaveItems().catch(() => null)]);
     state.items = items;
+    renderDrawerItems();
     if (leaveItems) state.leaveItems = new Set(leaveItems);
     renderLeaveRegistration();
     showError();
@@ -307,6 +340,15 @@ function selectDrawer(n) {
     button.setAttribute('aria-pressed', String(selected));
   });
   $('drawer-open-button').querySelector('span').textContent = `${n}번 서랍 열기`;
+  updateButtons();
+}
+
+function showItemDrawer(record) {
+  selectDrawer(record.drawer_id);
+  if ([...$('drawer-item-select').options].some(option => option.value === record.item)) $('drawer-item-select').value = record.item;
+  updateButtons();
+  $('drawer-open-button').focus({ preventScroll: true });
+  $('drawer').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
 }
 
 $('search-input').addEventListener('input', renderItems);
@@ -319,7 +361,32 @@ $('aim-button').addEventListener('click', () => {
 document.querySelectorAll('[data-drawer]').forEach(button => button.addEventListener('click', () => selectDrawer(Number(button.dataset.drawer))));
 $('drawer-open-button').addEventListener('click', () => {
   const n = state.drawer;
-  command('drawer', 'drawer', `${n}번 서랍 열기`, () => api.openDrawer(n));
+  command('drawer', 'drawer', `${n}번 서랍 열기`, async () => { await api.openDrawer(n); await refreshItems(); });
+});
+$('drawer-store-button').addEventListener('click', () => {
+  if ($('drawer-store-button').disabled) return;
+  const item = $('drawer-item-select').value;
+  const n = state.drawer;
+  command('drawer', 'drawer', `${itemLabel(item)} ${n}번 서랍 보관 등록`, async () => {
+    await api.storeDrawer(item, n);
+    await refreshItems();
+  });
+});
+$('drawer-item-select').addEventListener('change', updateButtons);
+$('drawer-custom-name').addEventListener('input', updateButtons);
+$('drawer-custom-add-button').addEventListener('click', () => {
+  if ($('drawer-custom-add-button').disabled) return;
+  const name = $('drawer-custom-name').value.trim();
+  const n = state.drawer;
+  command('drawer', 'drawer', `${name} ${n}번 서랍 추가·보관`, async () => {
+    const result = await api.createDrawerItem(name, n);
+    $('drawer-custom-name').value = '';
+    await refreshItems();
+    if (state.items.some(record => record.item === result.item)) $('drawer-item-select').value = result.item;
+  });
+});
+$('drawer-custom-name').addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); $('drawer-custom-add-button').click(); }
 });
 $('leave-item-add-button').addEventListener('click', () => {
   const item = $('leave-item-select').value;
@@ -328,9 +395,7 @@ $('leave-item-add-button').addEventListener('click', () => {
 });
 $('related-drawer-button').addEventListener('click', () => {
   if (state.record?.drawer_id === null || !state.record) return;
-  selectDrawer(state.record.drawer_id);
-  $('drawer-open-button').focus();
-  $('drawer').scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'center' });
+  showItemDrawer(state.record);
 });
 for (const [id, enabled] of [['buzzer-on-button', true], ['buzzer-off-button', false]]) {
   $(id).addEventListener('click', () => command('buzzer', 'sound', enabled ? '부저 찾기' : '부저 소리 끄기', () => api.setBuzzer(enabled), () => {
@@ -346,5 +411,6 @@ if (!isDemo) {
   $('footer-mode').textContent = '서버 모드 · 요청 접수와 실제 동작은 별도';
   $('buzzer-status').textContent = '실제 소리 상태 미확인';
 }
+renderDrawerItems();
 renderLeaveRegistration();
 refreshItems();

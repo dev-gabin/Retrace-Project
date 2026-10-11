@@ -89,7 +89,17 @@
             <button type="button" class="drawer-cell" data-drawer="5" aria-pressed="false" aria-label="5번 서랍, 하단 왼쪽"><span>05</span><i></i></button>
             <button type="button" class="drawer-cell" data-drawer="6" aria-pressed="false" aria-label="6번 서랍, 하단 오른쪽"><span>06</span><i></i></button>
           </div>
-          <button id="drawer-open-button" class="button button-secondary full-width" type="button"><span>1번 서랍 열기</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+          <label class="visually-hidden" for="drawer-item-select">보관할 물건 선택</label>
+          <select id="drawer-item-select" aria-label="보관할 물건 선택"></select>
+          <div class="drawer-custom-controls">
+            <label class="visually-hidden" for="drawer-custom-name">목록에 없는 물건 이름</label>
+            <input id="drawer-custom-name" type="text" maxlength="40" placeholder="직접 입력 예: 여권" autocomplete="off">
+            <button id="drawer-custom-add-button" class="button button-secondary" type="button" disabled>추가·보관</button>
+          </div>
+          <div class="drawer-actions">
+            <button id="drawer-open-button" class="button button-secondary full-width" type="button"><span>1번 서랍 열기</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+            <button id="drawer-store-button" class="button button-primary" type="button" disabled>보관 등록</button>
+          </div>
           <p class="tool-footnote">서랍은 자동으로 닫히지 않아요.</p>
         </section>
         <section class="tool-card buzzer-card" id="buzzer" aria-labelledby="buzzer-title">
