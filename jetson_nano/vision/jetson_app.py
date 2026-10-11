@@ -25,6 +25,7 @@ CONFIDENCE = 0.40
 IMAGE_SIZE = 640
 PERSON_ENTER_CONFIDENCE = 0.55
 PERSON_KEEP_CONFIDENCE = 0.40
+PERSON_MISS_GRACE_SECONDS = 3.0
 PERSON_GRACE_SECONDS = 10.0
 
 
@@ -198,9 +199,10 @@ def main() -> None:
             else:
                 if last_person_seen is None:
                     last_person_seen = now
-                if state != "GRACE":
-                    print("[STATE] GRACE")
-                state = "GRACE"
+                if state != "ACTIVE" or now - last_person_seen >= PERSON_MISS_GRACE_SECONDS:
+                    if state != "GRACE":
+                        print("[STATE] GRACE")
+                    state = "GRACE"
                 if not pir_high and now - last_person_seen >= PERSON_GRACE_SECONDS:
                     state = "IDLE"
                     tracker.reset_stability()
