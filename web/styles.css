@@ -90,7 +90,7 @@ h2 { font-size: 17px; letter-spacing: -.5px; font-weight: 700; line-height: 1.4;
 .record-state.uncertain { background: #fff7ed; color: #92400e; }
 .record-state.occluded { background: #f4f8ff; color: #345b8c; }
 .scene { position: relative; aspect-ratio: 640/340; margin: 0 24px; background: #f4f8ff; overflow: hidden; border-radius: 12px; }
-.scene img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scene img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .scene-label { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,.9); color: #345b8c; font-size: 9px; font-weight: 600; border-radius: 5px; padding: 3px 8px; }
 .photo-empty { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 7px; color: #4b6d9b; text-align: center; padding: 20px; }
 .photo-empty > .icon { width: 34px; height: 34px; color: #7ea2d0; margin-bottom: 5px; }
@@ -116,6 +116,12 @@ h2 { font-size: 17px; letter-spacing: -.5px; font-weight: 700; line-height: 1.4;
 .item-badge { margin-top: 8px; border-radius: 100px; background: #eff6ff; color: #1d4ed8; font-size: 9px; padding: 3px 8px; }
 .action-arrow { margin-left: auto; }
 .action-help { margin: 8px 0 0; text-align: center; font-size: 10px; color: #4b6d9b; }
+.photo-dialog { width: min(960px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 20px; border: 1px solid var(--line); border-radius: var(--radius); color: var(--ink); background: white; }
+.photo-dialog::backdrop { background: #0f172ab3; }
+.photo-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.photo-dialog-heading h2 { font-size: 17px; overflow-wrap: anywhere; }
+.photo-dialog p { font-size: 12px; color: var(--muted); }
+.photo-dialog img { display: block; width: 100%; max-height: 65dvh; object-fit: contain; background: #f4f8ff; border-radius: 8px; }
 .text-button { border: none; background: transparent; color: #1d4ed8; font-size: 12px; text-decoration: underline; display: block; margin: 9px auto 0; padding: 7px 10px; }
 .tool-card { border: 1px solid var(--line); background: white; border-radius: var(--radius); padding: 23px; }
 .tool-title { display: flex; align-items: center; gap: 11px; }

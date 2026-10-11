@@ -13,7 +13,6 @@ export function createDemoTransport() {
   return {
     async listItems() { return { items: structuredClone(items) }; },
     async getItem(item) { return structuredClone(items.find(record => record.item === item)); },
-    async aim() { return { ok: true }; },
     async createDrawerItem(name, n) {
       const existing = items.find(record => record.item.startsWith('custom_') && record.display_name === name);
       const item = existing?.item ?? 'custom_' + crypto.randomUUID().replaceAll('-', '').slice(0, 24);

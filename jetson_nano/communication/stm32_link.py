@@ -42,18 +42,8 @@ class Stm32Link:
     ) -> None:
         self.port = port or find_stm32_port()
         self.response_timeout = response_timeout
-        self.home_pan = (
-            int(os.environ.get("RETRACE_HOME_PAN", "85"))
-            if home_pan is None
-            else home_pan
-        )
-        self.home_tilt = (
-            int(os.environ.get("RETRACE_HOME_TILT", "42"))
-            if home_tilt is None
-            else home_tilt
-        )
-        if not 0 <= self.home_pan <= 180 or not 0 <= self.home_tilt <= 180:
-            raise ValueError("home pan and tilt must be between 0 and 180")
+        # Keep legacy constructor arguments for old tools. PIR reception no
+        # longer depends on laser calibration or home-angle environment values.
         try:
             self._serial = serial.Serial(
                 self.port,
@@ -90,19 +80,15 @@ class Stm32Link:
         self._command("PING", "OK@PING")
 
     def aim(self, pan: int, tilt: int) -> None:
-        if not 0 <= pan <= 180 or not 0 <= tilt <= 180:
-            raise ValueError("pan and tilt must be between 0 and 180")
-        self._command(f"AIM:{pan},{tilt}", "OK@AIM")
+        raise Stm32LinkError("LASER_DISABLED: use the last-seen photo and time")
 
     def laser(self, enabled: bool) -> None:
-        state = "ON" if enabled else "OFF"
-        self._command(f"LASER:{state}", "OK@LASER")
+        if enabled:
+            raise Stm32LinkError("LASER_DISABLED: use the last-seen photo and time")
+        self._command("LASER:OFF", "OK@LASER")
 
     def home(self) -> None:
-        # The STM32 HOME command is fixed at 90,90. Use the calibrated Jetson
-        # home so every caller, including the integrated test page, returns to
-        # the actual optical center instead.
-        self.aim(self.home_pan, self.home_tilt)
+        self.laser(False)
 
     def point(
         self,
@@ -112,17 +98,7 @@ class Stm32Link:
         settle_seconds: float = 0.5,
         on_seconds: float = 1.0,
     ) -> None:
-        if settle_seconds < 0 or not 0 < on_seconds <= 5.0:
-            raise ValueError("invalid settle or laser-on duration")
-        self.laser(False)
-        self.aim(pan, tilt)
-        time.sleep(settle_seconds)
-        try:
-            self.laser(True)
-            time.sleep(on_seconds)
-        finally:
-            self.laser(False)
-            self.home()
+        raise Stm32LinkError("LASER_DISABLED: use the last-seen photo and time")
 
     def get_event(self, timeout: float | None = None) -> str | None:
         try:

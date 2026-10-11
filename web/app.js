@@ -55,10 +55,14 @@ function relativeTime(value) {
   return `${Math.floor(minutes / 1440)}일 전`;
 }
 
+function recordedTime(value) {
+  return value ? new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Seoul' }).format(new Date(value)) : '기록 없음';
+}
+
 function locationText(record) {
   if (!record.seen_at) return '아직 목격 기록이 없어요';
   if (record.drawer_id !== null) return `${record.drawer_id}번 서랍에 보관 등록했어요`;
-  return record.pos_x === null ? '위치 정보 없음' : '카메라 감지 영역에 기록되어 있어요';
+  return `${recordedTime(record.seen_at)}에 마지막으로 확인했어요.`;
 }
 
 function spokenTime(value, now = new Date()) {
@@ -78,13 +82,12 @@ function spokenDrawerNumber(n) {
 }
 
 function spokenRecord(record, now = new Date()) {
-  if (!record || record.drawer_id === null) return '';
   const when = spokenTime(record?.seen_at, now);
   if (!when) return '';
   const name = itemLabel(record.item);
   const last = name.charCodeAt(name.length - 1);
   const topic = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0 ? '은' : '는';
-  const location = `${spokenDrawerNumber(record.drawer_id)} 서랍에 보관 등록했어요.`;
+  const location = record.drawer_id !== null ? `${spokenDrawerNumber(record.drawer_id)} 서랍에 보관 등록했어요.` : `${record.snapshot ? '이 사진 속 위치에서' : '카메라에서'} 마지막으로 확인됐어요.`;
   return `${isDemo ? '샘플 기록입니다. ' : ''}${name}${topic} ${when} ${location}`;
 }
 
@@ -248,7 +251,7 @@ function renderItems() {
       badge.textContent = '외출 알림';
       button.append(badge);
     }
-    button.addEventListener('click', () => selectItem(record.item, { navigateToDrawer: true, readAloud: record.drawer_id !== null }));
+    button.addEventListener('click', () => selectItem(record.item, { navigateToDrawer: true, readAloud: true }));
     fragment.append(button);
   }
   $('item-list').replaceChildren(fragment);
@@ -258,11 +261,10 @@ function renderItems() {
 
 function updateButtons() {
   const record = state.record;
-  $('aim-button').disabled = state.detailLoading || !record || record.seen_at === null || record.pos_x === null || record.drawer_id !== null || state.busy.has('aim');
-  $('record-speech-button').hidden = !record || record.drawer_id === null;
-  $('record-speech-button').disabled = state.detailLoading || !record?.seen_at || record.drawer_id === null || !speechAvailable();
-  $('record-speech-button').querySelector('span').textContent = activeSpeech ? '읽기 중지' : '보관 시각 읽어주기';
-  $('record-speech-button').title = speechAvailable() ? '선택한 서랍 물건의 보관 등록 시각을 읽어요' : '이 브라우저에서는 음성 읽어주기를 지원하지 않아요';
+  $('photo-button').disabled = state.detailLoading || !record || !api.snapshotUrl(record) || $('snapshot-image').hidden;
+  $('record-speech-button').disabled = state.detailLoading || !record?.seen_at || !speechAvailable();
+  $('record-speech-button').querySelector('span').textContent = activeSpeech ? '읽기 중지' : '보관·확인 시각 읽어주기';
+  $('record-speech-button').title = speechAvailable() ? '선택한 물건의 보관 등록 또는 마지막 확인 시각을 읽어요' : '이 브라우저에서는 음성 읽어주기를 지원하지 않아요';
   $('drawer-open-button').disabled = state.busy.has('drawer');
   const storageItem = $('drawer-item-select').value;
   $('drawer-item-select').disabled = state.busy.has('drawer');
@@ -283,12 +285,13 @@ function clearPhoto(title) {
   $('photo-empty-title').textContent = title;
   $('scene-target').hidden = true;
   $('scene-label').hidden = true;
+  $('photo-dialog').close();
+  $('photo-dialog-image').removeAttribute('src');
 }
 
 function renderDetail() {
   const record = state.record;
   $('detail-card').setAttribute('aria-busy', String(state.detailLoading));
-  $('record-time-label').textContent = record && record.drawer_id !== null ? '보관 등록 시각' : '마지막 목격';
   if (!record) {
     clearPhoto(state.detailLoading ? '마지막 기록을 불러오는 중이에요' : '표시할 기록이 없어요');
     $('selected-name').textContent = state.selected ? itemLabel(state.selected) : '물건을 선택해 주세요';
@@ -299,20 +302,22 @@ function renderDetail() {
     $('record-state').textContent = state.detailLoading ? '기록 확인 중' : '기록 없음';
     $('record-state').className = 'record-state';
     $('related-drawer-button').hidden = true;
-    $('aim-help').textContent = '선택한 물건의 마지막 위치로 안내를 요청해요.';
+    $('record-time-label').textContent = '마지막 확인 시각';
+    $('photo-help').textContent = '사진과 확인 시각으로 어디에 두었는지 살펴보세요.';
     updateButtons();
     return;
   }
   $('selected-name').textContent = itemLabel(record.item);
   $('selected-location').textContent = locationText(record);
   $('relative-time').textContent = relativeTime(record.seen_at);
-  $('seen-at').textContent = record.seen_at ? new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }).format(new Date(record.seen_at)) : '기록 없음';
-  $('record-location').textContent = record.drawer_id !== null ? `${record.drawer_id}번 서랍` : record.pos_x !== null ? `이미지 좌표 (${record.pos_x}, ${record.pos_y})` : '위치 정보 없음';
+  $('record-time-label').textContent = record.drawer_id !== null ? '보관 등록 시각' : '마지막 확인 시각';
+  $('seen-at').textContent = recordedTime(record.seen_at);
+  $('record-location').textContent = record.drawer_id !== null ? `${record.drawer_id}번 서랍` : record.snapshot ? '기록 사진에서 확인' : '위치 정보 없음';
   $('record-state').textContent = record.drawer_id !== null ? '서랍 보관 등록' : record.seen_at ? stateLabels[record.state] : '기록 없음';
   $('record-state').className = `record-state ${record.state}`;
   $('related-drawer-button').hidden = record.drawer_id === null;
   $('related-drawer-button').textContent = `${record.drawer_id}번 서랍 선택하기`;
-  $('aim-help').textContent = record.drawer_id !== null ? '서랍 안에 기록된 물건은 서랍을 열어 확인해 주세요.' : record.pos_x === null || record.seen_at === null ? '위치 기록이 있어야 안내를 요청할 수 있어요.' : '목격 이후 물건이 이동했다면 위치가 달라질 수 있어요.';
+  $('photo-help').textContent = record.drawer_id !== null ? '보관 등록한 서랍을 열어 확인해 주세요.' : !record.snapshot ? '저장된 사진이 없어요. 카메라에서 다시 확인되면 사진이 표시돼요.' : '저장된 마지막 사진이에요. 확인 이후 물건이 이동했을 수 있어요.';
   const src = api.snapshotUrl(record);
   if (src) {
     $('photo-empty').hidden = true;
@@ -334,6 +339,7 @@ function renderDetail() {
 
 async function selectItem(item, { navigateToDrawer = false, readAloud = false } = {}) {
   stopRecordSpeech();
+  $('photo-dialog').close();
   const sequence = ++state.detailSequence;
   state.selected = item;
   state.record = null;
@@ -353,7 +359,7 @@ async function selectItem(item, { navigateToDrawer = false, readAloud = false } 
       state.detailLoading = false;
       renderDetail();
       if (navigateToDrawer && state.record && state.record.drawer_id !== null) showItemDrawer(state.record);
-      if (readAloud && state.record && state.record.drawer_id !== null) readRecord(state.record, { automatic: true });
+      if (readAloud && state.record) readRecord(state.record, { automatic: true });
     }
   }
 }
@@ -448,10 +454,27 @@ $('record-speech-button').addEventListener('click', () => {
   else readRecord(state.record);
 });
 globalThis.addEventListener('pagehide', stopRecordSpeech);
-$('aim-button').addEventListener('click', () => {
-  if ($('aim-button').disabled || !state.record) return;
-  const item = state.record.item;
-  command('aim', 'target', `${itemLabel(item)} 레이저 안내`, () => api.aim(item));
+$('photo-button').addEventListener('click', () => {
+  if ($('photo-button').disabled || !state.record) return;
+  const record = state.record;
+  $('photo-dialog-title').textContent = `${itemLabel(record.item)} · 마지막 확인 사진`;
+  $('photo-dialog-time').textContent = `${isDemo ? '샘플 · ' : ''}${recordedTime(record.seen_at)} (한국 시간)`;
+  $('photo-dialog-note').textContent = isDemo ? '실제 촬영 사진이 아닌 샘플 장면이에요.' : '저장된 마지막 사진이에요. 확인 이후 물건이 이동했을 수 있어요.';
+  $('photo-dialog-image').alt = $('snapshot-image').alt;
+  $('photo-dialog-image').src = api.snapshotUrl(record);
+  $('photo-dialog').showModal();
+});
+$('photo-dialog-close').addEventListener('click', () => $('photo-dialog').close());
+$('photo-dialog').addEventListener('click', event => {
+  const dialog = $('photo-dialog');
+  const bounds = dialog.getBoundingClientRect();
+  if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) dialog.close();
+});
+$('photo-dialog-image').addEventListener('error', () => {
+  $('photo-dialog').close();
+  clearPhoto('사진을 불러오지 못했어요');
+  updateButtons();
+  showToast('사진을 불러오지 못했어요. 기록을 새로고침해 주세요.', true);
 });
 document.querySelectorAll('[data-drawer]').forEach(button => button.addEventListener('click', () => selectDrawer(Number(button.dataset.drawer))));
 $('drawer-open-button').addEventListener('click', () => {
@@ -503,7 +526,7 @@ for (const [id, enabled] of [['buzzer-on-button', true], ['buzzer-off-button', f
     $('sound-bars').classList.toggle('is-active', isDemo && enabled);
   }));
 }
-$('snapshot-image').addEventListener('error', () => clearPhoto('사진을 불러오지 못했어요'));
+$('snapshot-image').addEventListener('error', () => { clearPhoto('사진을 불러오지 못했어요'); updateButtons(); });
 if (!isDemo) {
   $('mode-chip').lastChild.textContent = '서버 모드';
   $('mode-notice-title').textContent = '서버에 연결하는 화면이에요.';

@@ -22,8 +22,7 @@ if "serial" not in sys.modules:
 
 from record.last_seen import LastSeenError, LastSeenRecord, LastSeenStore
 from record.leave_items import LeaveItems
-from vision.aim_mapper import AimMapper
-from vision.http_api import RetraceHttpServer
+from vision.http_api import HttpApiError, RetraceHttpServer
 from record.drawer_items import DrawerItems
 
 
@@ -86,12 +85,9 @@ class HttpApiTest(unittest.TestCase):
         self.stm32 = FakeStm32()
         self.server = RetraceHttpServer(
             self.store,  # type: ignore[arg-type]
-            self.stm32,  # type: ignore[arg-type]
-            AimMapper(640, 480, 135, 45, 60, 120),
             web_root=self.web_root,
             host="127.0.0.1",
             port=0,
-            laser_seconds=5.0,
             leave_items=LeaveItems(root / "data" / "leave_items.json"),
         )
         self.server.start()
@@ -122,9 +118,12 @@ class HttpApiTest(unittest.TestCase):
         self.assertEqual(record["pos_x"], 320)
         self.assertIsNone(record["drawer_id"])
 
-    def test_aim_drawer_and_buzzer_commands(self) -> None:
-        self.assertEqual(self.request("/api/items/keyboard/aim", {}), (200, {"ok": True}))
-        self.assertEqual(self.stm32.points, [(90, 90, 5.0)])
+    def test_retired_laser_keeps_drawer_and_buzzer_commands(self) -> None:
+        with self.assertRaises(HTTPError) as caught:
+            self.request("/api/items/keyboard/aim", {})
+        self.assertEqual(caught.exception.code, 410)
+        self.assertEqual(json.load(caught.exception)["error"]["code"], "LASER_DISABLED")
+        self.assertEqual(self.stm32.points, [])
         self.assertEqual(self.request("/api/drawers/6/open", {}), (200, {"ok": True}))
         self.assertEqual(self.request("/api/buzzer", {"enabled": True}), (200, {"ok": True}))
         self.assertEqual(self.request("/api/buzzer", {"enabled": False}), (200, {"ok": True}))
@@ -181,12 +180,12 @@ class HttpApiTest(unittest.TestCase):
             urlopen(self.base_url + "/snapshots/%2e%2e/index.html", timeout=2)
         self.assertEqual(caught.exception.code, 400)
 
-    def test_item_without_coordinates_returns_conflict(self) -> None:
+    def test_laser_is_retired_even_without_coordinates(self) -> None:
         with self.assertRaises(HTTPError) as caught:
             self.request("/api/items/wallet/aim", {})
-        self.assertEqual(caught.exception.code, 409)
+        self.assertEqual(caught.exception.code, 410)
         error = json.load(caught.exception)
-        self.assertEqual(error["error"]["code"], "NO_POSITION")
+        self.assertEqual(error["error"]["code"], "LASER_DISABLED")
 
     def test_unknown_item_returns_not_found(self) -> None:
         with self.assertRaises(HTTPError) as caught:
@@ -216,6 +215,13 @@ class ManualDrawerTest(unittest.TestCase):
         data = json.dumps(body).encode()
         self.server._handle_post(types.SimpleNamespace(path=path, headers={"Content-Length": str(len(data))}, rfile=io.BytesIO(data)))
 
+    def test_legacy_aim_route_never_calls_hardware(self):
+        for item in ["keyboard", "wallet", "missing_item"]:
+            with self.subTest(item=item), self.assertRaises(HttpApiError) as caught:
+                self.post(f"/api/items/{item}/aim", {})
+            self.assertEqual(caught.exception.status, 410)
+            self.assertEqual(caught.exception.code, "LASER_DISABLED")
+        self.assertEqual(self.store.commands, [])
 
     def test_unseen_storage_listing_and_persistence(self):
         self.post("/api/items/umbrella/drawer", {"drawer_id": 1})

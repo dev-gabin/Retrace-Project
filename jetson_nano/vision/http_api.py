@@ -13,11 +13,10 @@ import re
 import threading
 from urllib.parse import unquote, urlsplit
 
-from communication.stm32_link import Stm32Link, Stm32LinkError
+from communication.stm32_link import Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenRecord, LastSeenStore
 from record.leave_items import LeaveItems
 from record.drawer_items import DrawerItems
-from vision.aim_mapper import AimMapper
 
 
 _ITEM_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
@@ -36,28 +35,20 @@ class RetraceHttpServer:
     def __init__(
         self,
         storage: LastSeenStore,
-        stm32: Stm32Link,
-        mapper: AimMapper,
         *,
         web_root: Path,
         host: str = "0.0.0.0",
         port: int = 8080,
         drawer_target: str = "DRAWER",
         buzzer_target: str = "TOKEN",
-        laser_seconds: float = 5.0,
         leave_items: LeaveItems | None = None,
     ) -> None:
-        if not 0 < laser_seconds <= 5.0:
-            raise ValueError("RETRACE_LASER_SECONDS must be in (0, 5]")
         self.storage = storage
         self.drawer_items = DrawerItems(storage.data_dir / "drawer_items.json")
         self.leave_items = leave_items
-        self.stm32 = stm32
-        self.mapper = mapper
         self.web_root = Path(web_root).resolve()
         self.drawer_target = drawer_target
         self.buzzer_target = buzzer_target
-        self.laser_seconds = laser_seconds
         handler = self._make_handler()
         self._server = ThreadingHTTPServer((host, port), handler)
         self._server.daemon_threads = True
@@ -71,21 +62,16 @@ class RetraceHttpServer:
     def from_env(
         cls,
         storage: LastSeenStore,
-        stm32: Stm32Link,
-        mapper: AimMapper,
         web_root: Path,
         leave_items: LeaveItems | None = None,
     ) -> "RetraceHttpServer":
         return cls(
             storage,
-            stm32,
-            mapper,
             web_root=web_root,
             host=os.environ.get("RETRACE_HTTP_HOST", "0.0.0.0"),
             port=int(os.environ.get("RETRACE_HTTP_PORT", "8080")),
             drawer_target=os.environ.get("RETRACE_DRAWER_CLIENT_ID", "DRAWER"),
             buzzer_target=os.environ.get("RETRACE_BUZZER_CLIENT_ID", "TOKEN"),
-            laser_seconds=float(os.environ.get("RETRACE_LASER_SECONDS", "5.0")),
             leave_items=leave_items,
         )
 
@@ -233,17 +219,11 @@ class RetraceHttpServer:
             item = path[len("/api/items/"):-len("/aim")]
             self._validate_item(item)
             self._read_json_object(request, must_be_empty=True)
-            record = self._get_item(item)
-            if record.pos_x is None or record.pos_y is None:
-                raise HttpApiError(
-                    HTTPStatus.CONFLICT,
-                    "NO_POSITION",
-                    "저장된 물건 좌표가 없습니다.",
-                )
-            pan, tilt = self.mapper.map(record.pos_x, record.pos_y)
-            self.stm32.point(pan, tilt, on_seconds=self.laser_seconds)
-            self._send_json(request, HTTPStatus.OK, {"ok": True})
-            return
+            raise HttpApiError(
+                HTTPStatus.GONE,
+                "LASER_DISABLED",
+                "레이저 안내가 종료되었습니다. 마지막 확인 사진과 시각을 확인해 주세요.",
+            )
 
         drawer_match = _DRAWER_PATH.fullmatch(path)
         if drawer_match is not None:

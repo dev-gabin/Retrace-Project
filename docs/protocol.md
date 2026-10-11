@@ -254,7 +254,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 |---|---|---|
 | GET | `/api/items` | 전체 물건 Last Seen 목록 |
 | GET | `/api/items/{item}` | 특정 물건 Last Seen |
-| POST | `/api/items/{item}/aim` | 해당 물건 위치로 레이저 안내 |
+| POST | `/api/items/{item}/aim` | 종료된 레이저 API, HTTP 410 `LASER_DISABLED` 반환 |
 | POST | `/api/drawers/{n}/open` | n번 서랍 열기 |
 | POST | `/api/buzzer` | 부저 태그 호출 |
 | GET | `/snapshots/{file}` | 스냅샷 이미지 |
@@ -271,11 +271,11 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 |---|---|---|
 | `GET /api/items` | 없음 | `{ "items": [LastSeen, ...] }` |
 | `GET /api/items/{item}` | 없음 | `LastSeen` 객체 |
-| `POST /api/items/{item}/aim` | `{}` | `{ "ok": true }` |
+| `POST /api/items/{item}/aim` | `{}` | HTTP 410 `{ "error": { "code": "LASER_DISABLED", "message": "..." } }` |
 | `POST /api/drawers/{n}/open` | `{}` | `{ "ok": true }` |
 | `POST /api/buzzer` | `{ "enabled": true }` 또는 `{ "enabled": false }` | `{ "ok": true }` |
 
-POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=true`는 BLE ASCII `1`, `false`는 ASCII `0`으로 Jetson이 변환합니다. 웹은 UART·MQTT·BLE를 직접 제어하지 않습니다. 레이저 요청은 물건 ID만 보내며 목표 각도는 Jetson이 계산합니다.
+POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=true`는 BLE ASCII `1`, `false`는 ASCII `0`으로 Jetson이 변환합니다. 웹은 UART·MQTT·BLE를 직접 제어하지 않습니다. 레이저 안내는 종료했으며 웹은 마지막 확인 사진과 시각을 표시합니다. 기존 STM32 명령 표는 보드 펌웨어의 명령 정의이며, Jetson 시리얼 링크는 ON·조준 요청을 차단하고 OFF만 허용합니다.
 
 `LastSeen` 예제 (8장 필드 이름 사용):
 

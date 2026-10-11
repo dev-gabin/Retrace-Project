@@ -20,7 +20,6 @@ from communication.phone_notifier import build_request, leave_notification
 from communication.server_events import DeviceEvent, parse_event_line
 from record.last_seen import LastSeenError, LastSeenRecord
 from record.leave_items import LeaveItems
-from vision.aim_mapper import AimMapper
 from vision.leave_alert import DeviceEventHandler, LeaveVerifier
 
 
@@ -86,7 +85,7 @@ class LeaveAlertTestCase(unittest.TestCase):
         store, stm32, notifier, clock = FakeStore(records), FakeStm32(), FakeNotifier(), Clock()
         verifier = LeaveVerifier(seconds=0.2)
         handler = DeviceEventHandler(
-            store, stm32, AimMapper(640, 480, 135, 45, 60, 120), notifier,
+            store, notifier,
             self.leave_items, verifier, clock=clock, run_async=False,
         )
         return handler, verifier, store, stm32, notifier, clock
@@ -137,7 +136,7 @@ class LeaveItemsTest(LeaveAlertTestCase):
 
 
 class DeviceEventHandlerTest(LeaveAlertTestCase):
-    def test_freshly_confirmed_registered_items_alert_light_phone_and_laser(self) -> None:
+    def test_freshly_confirmed_items_keep_light_and_phone_without_laser(self) -> None:
         handler, verifier, store, stm32, notifier, _ = self.make_handler(
             [], ["car_key", "wallet", "airpods"])
         self.confirm(handler, verifier, [
@@ -147,7 +146,7 @@ class DeviceEventHandlerTest(LeaveAlertTestCase):
         ])
         self.assertEqual(store.commands, [("ENTRANCE", "LIGHT:ALERT")])
         self.assertEqual(notifier.sent, [leave_notification(["차키", "지갑"])])
-        self.assertEqual(len(stm32.points), 2)
+        self.assertEqual(stm32.points, [])
 
     def test_unregistered_and_low_confidence_items_are_ignored(self) -> None:
         handler, verifier, store, _, notifier, _ = self.make_handler([], ["keyboard"])

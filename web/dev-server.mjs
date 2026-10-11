@@ -18,7 +18,8 @@ const server = http.createServer(async (request, response) => {
     const file = path.resolve(root, '.' + (pathname === '/' ? '/index.html' : pathname));
     if (!file.startsWith(root + path.sep) || pathname.includes('\\')) { send(403, 'Forbidden'); return; }
     if (!(await stat(file)).isFile()) { send(404, 'Not found'); return; }
-    const content = await readFile(file);
+    let content = await readFile(file);
+    if (pathname === '/config.js') content = Buffer.from("export const config = Object.freeze({ mode: 'demo', apiBaseUrl: '', timeoutMs: 8000 });");
     response.writeHead(200, { 'Content-Type': mime[path.extname(file)] ?? 'application/octet-stream', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     response.end(request.method === 'HEAD' ? undefined : content);
   } catch (error) { send(error.code === 'ENOENT' || error.code === 'ENOTDIR' ? 404 : 400, 'Not found or invalid path'); }

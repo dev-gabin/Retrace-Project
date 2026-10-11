@@ -9,7 +9,6 @@ from communication.server_events import ServerEventError, ServerEventListener
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenStore
 from record.leave_items import LeaveItems
-from vision.aim_mapper import AimMapper
 from vision.detector import YoloDetector
 from vision.http_api import RetraceHttpServer
 from vision.leave_alert import DeviceEventHandler, LeaveVerifier
@@ -36,7 +35,7 @@ def main() -> None:
 
     print(f"[MODEL] {MODEL_PATH}")
     detector = YoloDetector(MODEL_PATH, CONFIDENCE, IMAGE_SIZE)
-    tracker = StableObjectTracker()
+    tracker = StableObjectTracker(stable_frames=2)
 
     storage = None
     stm32 = None
@@ -71,7 +70,7 @@ def main() -> None:
     # 카메라 자동 노출 안정화 및 초기 불완전 프레임 제거
     time.sleep(1.0)
     warmup_frame = None
-    for _ in range(30):
+    for _ in range(10):
         ok, candidate = camera.read()
         if ok:
             warmup_frame = candidate
@@ -82,14 +81,10 @@ def main() -> None:
         storage.close()
         return
 
-    frame_height, frame_width = warmup_frame.shape[:2]
     leave_items = LeaveItems(storage.data_dir / "leave_items.json")
     try:
-        mapper = AimMapper.from_env(frame_width, frame_height)
         http_server = RetraceHttpServer.from_env(
             storage,
-            stm32,
-            mapper,
             REPOSITORY_DIR / "web",
             leave_items,
         )
@@ -119,7 +114,7 @@ def main() -> None:
         event_listener.start()
         leave_verifier = LeaveVerifier.from_env()
         event_handler = DeviceEventHandler.from_env(
-            storage, stm32, mapper, notifier, leave_items, leave_verifier
+            storage, notifier, leave_items, leave_verifier
         )
     except (PhoneNotifierError, ServerEventError, ValueError) as error:
         print(f"[EVENT] 현관·SOS 이벤트 처리 끔: {error}")
@@ -129,7 +124,7 @@ def main() -> None:
     pir_high = False
     state_started = time.monotonic()
     last_person_seen: float | None = None
-    person_window: deque[bool] = deque(maxlen=5)
+    person_window: deque[bool] = deque(maxlen=3)
 
     print("[START] PIR-triggered Jetson YOLO mode (Ctrl+C: 종료)")
 
@@ -182,7 +177,7 @@ def main() -> None:
 
             if state == "SEARCHING":
                 person_window.append(person_confidence >= PERSON_ENTER_CONFIDENCE)
-                if len(person_window) == 5 and sum(person_window) >= 3:
+                if len(person_window) >= 2 and sum(person_window) >= 2:
                     state = "ACTIVE"
                     last_person_seen = now
                     print("[STATE] ACTIVE")

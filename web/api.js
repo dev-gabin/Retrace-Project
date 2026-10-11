@@ -107,7 +107,7 @@ export function createApi({ mode = 'demo', apiBaseUrl = '', timeoutMs = 8000, fe
     },
     async aim(item) {
       validItemId(item);
-      return acknowledged(mode === 'demo' ? await demo.aim(item) : await request(`/api/items/${encodeURIComponent(item)}/aim`, { method: 'POST', body: {} }));
+      throw new ApiError('LASER_DISABLED', '마지막 확인 사진과 시각을 확인해 주세요.', 410);
     },
     async createDrawerItem(name, n) {
       name = validCustomName(name);

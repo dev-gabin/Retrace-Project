@@ -5,6 +5,7 @@ import { createApi, validateItem, ApiError } from '../api.js';
 const record = (item = 'carkey') => ({ item, pos_x: 412, pos_y: 288, seen_at: '2026-10-03T14:22:05+09:00', snapshot: 'snapshots/key.jpg', drawer_id: null, state: 'visible' });
 const reply = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => structuredClone(data) });
 const hasCode = code => error => error instanceof ApiError && error.code === code;
+
 test('직접 입력한 물건 이름은 보관·이동·해제 후에도 유지한다', async () => {
   const api = createApi();
   const added = await api.createDrawerItem('  여권  ', 3);
@@ -78,14 +79,12 @@ test('실제 모드는 문서의 모든 경로·메서드·본문을 사용한�
   const { api, calls } = liveWith(url => url.endsWith('/api/items') ? { items: [record()] } : url.endsWith('/api/items/carkey') ? record() : { ok: true });
   assert.deepEqual(await api.listItems(), [record()]);
   assert.deepEqual(await api.getItem('carkey'), record());
-  await api.aim('carkey');
   await api.openDrawer(6);
   await api.setBuzzer(true);
   await api.setBuzzer(false);
   assert.deepEqual(calls.map(({ url, method, body }) => [url, method, body]), [
     ['http://jetson.local:8080/api/items', 'GET', undefined],
     ['http://jetson.local:8080/api/items/carkey', 'GET', undefined],
-    ['http://jetson.local:8080/api/items/carkey/aim', 'POST', '{}'],
     ['http://jetson.local:8080/api/drawers/6/open', 'POST', '{}'],
     ['http://jetson.local:8080/api/buzzer', 'POST', '{"enabled":true}'],
     ['http://jetson.local:8080/api/buzzer', 'POST', '{"enabled":false}'],
@@ -98,16 +97,14 @@ test('실제 모드는 문서의 모든 경로·메서드·본문을 사용한�
   }
 });
 
-test('서버가 반환한 동적 물건 ID를 조회하고 안내할 수 있다', async () => {
+test('서버가 반환한 동적 물건 ID의 마지막 기록을 조회할 수 있다', async () => {
   const keyboard = record('keyboard');
   const { api, calls } = liveWith(url => url.endsWith('/api/items') ? { items: [keyboard] } : url.endsWith('/api/items/keyboard') ? keyboard : { ok: true });
   assert.deepEqual(await api.listItems(), [keyboard]);
   assert.deepEqual(await api.getItem('keyboard'), keyboard);
-  await api.aim('keyboard');
   assert.deepEqual(calls.map(call => call.url), [
     'http://jetson.local:8080/api/items',
     'http://jetson.local:8080/api/items/keyboard',
-    'http://jetson.local:8080/api/items/keyboard/aim',
   ]);
 });
 
@@ -118,7 +115,7 @@ test('샘플 모드는 모든 조회·제어에서 네트워크를 사용하지 
   assert.deepEqual(items.map(item => item.item), ['carkey', 'airpods', 'wallet']);
   items[0].pos_x = 999;
   assert.equal((await api.getItem('carkey')).pos_x, 412);
-  for (const item of items) await api.aim(item.item);
+  for (const item of items) await assert.rejects(api.aim(item.item), hasCode('LASER_DISABLED'));
   for (let n = 1; n <= 6; n++) await api.openDrawer(n);
   await api.setBuzzer(true);
   await api.setBuzzer(false);
@@ -133,6 +130,12 @@ test('잘못된 물건·서랍·부저 값은 요청 전에 거절한다', async
   }
   for (const value of [0, 7, -1, 1.5, '1', null]) await assert.rejects(api.openDrawer(value), hasCode('INVALID_DRAWER'));
   for (const value of [0, 1, '0', '1', null]) await assert.rejects(api.setBuzzer(value), hasCode('INVALID_BUZZER'));
+  assert.equal(calls.length, 0);
+});
+
+test('예전 레이저 API도 실제 서버에 제어 요청을 보내지 않는다', async () => {
+  const { api, calls } = liveWith({ ok: true });
+  await assert.rejects(api.aim('carkey'), error => hasCode('LASER_DISABLED')(error) && error.status === 410);
   assert.equal(calls.length, 0);
 });
 
@@ -176,7 +179,6 @@ test('목록의 잘못된 구조·중복 ID와 다른 물건 상세를 거절한
 test('ok: true 접수 응답만 성공으로 처리한다', async () => {
   for (const data of [{ ok: false }, { ok: 'true' }, {}, null]) {
     const { api } = liveWith(data);
-    await assert.rejects(api.aim('carkey'), hasCode('BAD_RESPONSE'));
     await assert.rejects(api.openDrawer(1), hasCode('BAD_RESPONSE'));
     await assert.rejects(api.setBuzzer(false), hasCode('BAD_RESPONSE'));
   }

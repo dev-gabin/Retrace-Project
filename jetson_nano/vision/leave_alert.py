@@ -13,10 +13,8 @@ from communication.phone_notifier import (
     sos_notification,
 )
 from communication.server_events import DeviceEvent
-from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenStore
 from record.leave_items import LeaveItems
-from vision.aim_mapper import AimMapper
 
 
 # Same display names as web/app.js; other items use their ID.
@@ -117,27 +115,21 @@ class DeviceEventHandler:
     def __init__(
         self,
         storage: LastSeenStore,
-        stm32: Stm32Link,
-        mapper: AimMapper,
         notifier: PhoneNotifier | None,
         leave_items: LeaveItems,
         leave_verifier: LeaveVerifier,
         *,
         entrance_id: str = "ENTRANCE",
         cooldown_seconds: float = 15.0,
-        laser_seconds: float = 5.0,
         clock: Callable[[], float] = time.monotonic,
         run_async: bool = True,
     ) -> None:
         self.storage = storage
-        self.stm32 = stm32
-        self.mapper = mapper
         self.notifier = notifier
         self.entrance_id = entrance_id
         self.leave_items = leave_items
         self.leave_verifier = leave_verifier
         self.cooldown_seconds = cooldown_seconds
-        self.laser_seconds = laser_seconds
         self._clock = clock
         self._run_async = run_async
         self._last_leave_alert: float | None = None
@@ -147,16 +139,12 @@ class DeviceEventHandler:
     def from_env(
         cls,
         storage: LastSeenStore,
-        stm32: Stm32Link,
-        mapper: AimMapper,
         notifier: PhoneNotifier | None,
         leave_items: LeaveItems,
         leave_verifier: LeaveVerifier,
     ) -> "DeviceEventHandler":
         return cls(
             storage,
-            stm32,
-            mapper,
             notifier,
             leave_items,
             leave_verifier,
@@ -164,7 +152,6 @@ class DeviceEventHandler:
             cooldown_seconds=float(
                 os.environ.get("RETRACE_LEAVE_ALERT_COOLDOWN", "15")
             ),
-            laser_seconds=float(os.environ.get("RETRACE_LASER_SECONDS", "5.0")),
         )
 
     def handle(self, event: DeviceEvent) -> None:
@@ -204,17 +191,10 @@ class DeviceEventHandler:
             return
 
         names = [ITEM_LABELS.get(item, item) for item, _, _ in confirmed]
-        print(f"[LEAVE] 책상에 남은 물건: {', '.join(names)}; 현관등 경고·폰 알림·레이저 안내")
+        print(f"[LEAVE] 책상에 남은 물건: {', '.join(names)}; 현관등 경고·폰 알림")
         if self.notifier is not None:
             self.notifier.send(leave_notification(names))
         try:
             self.storage.send_device_command(self.entrance_id, "LIGHT:ALERT")
         except LastSeenError as error:
             print(f"[LEAVE] 현관등 ALERT 실패: {error}")
-        # One laser: point at each item in turn.
-        for item, pos_x, pos_y in confirmed:
-            try:
-                pan, tilt = self.mapper.map(pos_x, pos_y)
-                self.stm32.point(pan, tilt, on_seconds=self.laser_seconds)
-            except (Stm32LinkError, ValueError) as error:
-                print(f"[LEAVE] 레이저 안내 실패 ({item}): {error}")
