@@ -1,4 +1,6 @@
 weather_roots.pem is the unmodified CA certificate bundle from certifi 2026.7.22.
+weather_roots.crt_bundle contains the subject and public-key DER data extracted
+from that same PEM, in ESP-IDF's compact certificate bundle format.
 Certificates originate from Mozilla's root certificate store.
 Source: https://github.com/certifi/python-certifi
 Mozilla source: https://hg.mozilla.org/mozilla-central/file/tip/security/nss/lib/ckfw/builtins/certdata.txt

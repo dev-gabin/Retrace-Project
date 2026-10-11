@@ -77,4 +77,5 @@ pio device monitor -d esp32/preparation_display
 
 - 날씨 데이터: [Open-Meteo API](https://open-meteo.com/en/docs). 무료 비상업용 API를 사용합니다.
 - LCD 드라이버: [LiquidCrystal_PCF8574 2.3.0](https://github.com/mathertel/LiquidCrystal_PCF8574).
-- HTTPS는 인증서 검증을 사용합니다. `data/weather_roots.pem`은 설치된 **certifi 2026.7.22**의 Mozilla CA 번들 사본입니다. 라이선스는 `data/NOTICE.txt`에 기록했습니다. 향후 신뢰 인증서가 변경되면 certifi/Mozilla 최신 번들로 갱신하고 다시 빌드합니다.
+- HTTPS는 인증서 검증을 사용합니다. `data/weather_roots.pem`은 설치된 **certifi 2026.7.22**의 Mozilla CA 번들 사본입니다. 펌웨어에는 PEM 전체 대신 **`weather_roots.crt_bundle` 압축 번들**을 넣습니다. PEM 전체를 `setCACert`로 읽으면 C3에서 `X509 - Allocation of memory failed`가 발생할 수 있어, `setCACertBundle` 방식으로 바꿨습니다. 같은 CA 목록을 유지하면서 런타임 메모리 사용을 줄입니다.
+- 인증서 갱신 시 PEM을 갱신한 뒤 `python esp32/preparation_display/tools/build_cert_bundle.py`를 실행하고 다시 빌드합니다. 생성된 `.crt_bundle`도 소스와 함께 보관합니다. 형식은 [Espressif 인증서 번들](https://docs.espressif.com/projects/esp-idf/en/v4.4.7/esp32c3/api-reference/protocols/esp_crt_bundle.html)을 따릅니다. 라이선스는 `data/NOTICE.txt`에 기록했습니다.

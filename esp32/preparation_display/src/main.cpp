@@ -14,7 +14,7 @@
 #include "display_config.example.h"
 #endif
 
-extern const char weatherRoots[] asm("_binary_data_weather_roots_pem_start");
+extern const uint8_t weatherRoots[] asm("_binary_data_weather_roots_crt_bundle_start");
 LiquidCrystal_PCF8574 lcd(LCD_ADDRESS);
 constexpr size_t MAX_ITEMS = 20;
 String selected[MAX_ITEMS];
@@ -139,7 +139,7 @@ void fetchItems() {
 
 void fetchWeather() {
     WiFiClientSecure client;
-    client.setCACert(weatherRoots); client.setHandshakeTimeout(5);
+    client.setCACertBundle(weatherRoots); client.setHandshakeTimeout(5);
     HTTPClient http;
     http.setConnectTimeout(3000); http.setTimeout(3000); http.useHTTP10(true);
     String url = "https://api.open-meteo.com/v1/forecast?latitude=" + String(WEATHER_LATITUDE, 4)
