@@ -37,9 +37,23 @@ class Stm32Link:
         port: str | None = None,
         baudrate: int = 115200,
         response_timeout: float = 3.0,
+        home_pan: int | None = None,
+        home_tilt: int | None = None,
     ) -> None:
         self.port = port or find_stm32_port()
         self.response_timeout = response_timeout
+        self.home_pan = (
+            int(os.environ.get("RETRACE_HOME_PAN", "85"))
+            if home_pan is None
+            else home_pan
+        )
+        self.home_tilt = (
+            int(os.environ.get("RETRACE_HOME_TILT", "42"))
+            if home_tilt is None
+            else home_tilt
+        )
+        if not 0 <= self.home_pan <= 180 or not 0 <= self.home_tilt <= 180:
+            raise ValueError("home pan and tilt must be between 0 and 180")
         try:
             self._serial = serial.Serial(
                 self.port,
@@ -85,7 +99,10 @@ class Stm32Link:
         self._command(f"LASER:{state}", "OK@LASER")
 
     def home(self) -> None:
-        self._command("HOME", "OK@HOME")
+        # The STM32 HOME command is fixed at 90,90. Use the calibrated Jetson
+        # home so every caller, including the integrated test page, returns to
+        # the actual optical center instead.
+        self.aim(self.home_pan, self.home_tilt)
 
     def point(
         self,
