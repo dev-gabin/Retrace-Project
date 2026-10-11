@@ -124,7 +124,7 @@ class DeviceEventHandler:
         leave_verifier: LeaveVerifier,
         *,
         entrance_id: str = "ENTRANCE",
-        cooldown_seconds: float = 60.0,
+        cooldown_seconds: float = 15.0,
         laser_seconds: float = 5.0,
         clock: Callable[[], float] = time.monotonic,
         run_async: bool = True,
@@ -162,7 +162,7 @@ class DeviceEventHandler:
             leave_verifier,
             entrance_id=os.environ.get("RETRACE_ENTRANCE_CLIENT_ID", "ENTRANCE"),
             cooldown_seconds=float(
-                os.environ.get("RETRACE_LEAVE_ALERT_COOLDOWN", "60")
+                os.environ.get("RETRACE_LEAVE_ALERT_COOLDOWN", "15")
             ),
             laser_seconds=float(os.environ.get("RETRACE_LASER_SECONDS", "5.0")),
         )

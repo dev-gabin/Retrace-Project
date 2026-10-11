@@ -169,10 +169,10 @@ class DeviceEventHandlerTest(LeaveAlertTestCase):
     def test_cooldown_suppresses_repeated_motion(self) -> None:
         handler, verifier, _, _, notifier, clock = self.make_handler([], ["car_key"])
         self.confirm(handler, verifier, [{"item_id": "car_key", "confidence": 0.8, "center": (1, 1)}])
-        clock.now += 30
+        clock.now += 14
         handler.handle(PIRON)
         self.assertEqual(len(notifier.sent), 1)
-        clock.now += 31
+        clock.now += 1
         self.confirm(handler, verifier, [{"item_id": "car_key", "confidence": 0.8, "center": (1, 1)}])
         self.assertEqual(len(notifier.sent), 2)
 
