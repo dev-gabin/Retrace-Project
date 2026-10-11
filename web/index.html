@@ -44,6 +44,16 @@
     <div id="load-error" class="error-notice" role="alert" hidden></div>
     <div class="workspace">
       <div class="find-column">
+        <section class="leave-register-card" aria-labelledby="leave-register-title">
+          <div class="section-heading"><div><p class="eyebrow">LEAVE CHECK</p><h2 id="leave-register-title">외출 확인 물건 등록</h2></div><span class="section-caption">카메라 인식 전에도 등록할 수 있어요</span></div>
+          <p class="leave-register-copy">모델 전체 목록에서 선택해 두면, 외출 감지 시 해당 물건이 책상에 남아 있는지 확인해 알려드려요.</p>
+          <div class="leave-register-controls">
+            <label class="visually-hidden" for="leave-item-select">외출 확인 물건 선택</label>
+            <select id="leave-item-select"></select>
+            <button class="button button-secondary" id="leave-item-add-button" type="button">등록</button>
+          </div>
+          <div id="leave-item-list" class="leave-item-list" aria-live="polite"></div>
+        </section>
         <section id="items" class="items-section" aria-labelledby="items-title">
           <div class="section-heading"><h2 id="items-title">내 물건 <span id="item-count" class="count">—</span></h2><span class="section-caption">하나를 선택해 찾아보세요</span></div>
           <label class="search-field"><svg class="icon" aria-hidden="true"><use href="#icon-search"/></svg><span class="visually-hidden">물건 이름 검색</span><input id="search-input" type="search" placeholder="어떤 물건을 찾고 있나요?" autocomplete="off"></label>
@@ -61,8 +71,6 @@
           <div class="detail-body"><div class="selected-summary"><div><h3 id="selected-name">물건을 선택해 주세요</h3><p id="selected-location">마지막 기록을 확인할 수 있어요.</p></div><span id="relative-time" class="time-pill">—</span></div>
             <dl class="record-metadata"><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg>마지막 목격</dt><dd id="seen-at">—</dd></div><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-pin"/></svg>기록 위치</dt><dd id="record-location">—</dd></div></dl>
             <button class="button button-primary detail-action" id="aim-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span>레이저로 위치 안내</span><svg class="icon action-arrow" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
-            <button class="button button-secondary detail-action leave-button" id="leave-button" type="button" aria-pressed="false" disabled><svg class="icon" aria-hidden="true"><use href="#icon-key"/></svg><span id="leave-button-label">외출 알림 등록</span></button>
-            <p class="action-help" id="leave-help">등록한 물건을 책상에 두고 나가면 현관에서 알려드려요.</p>
             <button class="text-button" id="related-drawer-button" type="button" hidden>기록된 서랍 선택하기</button>
             <p class="action-help" id="aim-help">선택한 물건의 마지막 위치로 안내를 요청해요.</p>
           </div>

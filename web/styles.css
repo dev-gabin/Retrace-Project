@@ -50,6 +50,14 @@ h1 { margin: 0; font-size: clamp(24px,2.65vw,33px); line-height: 1.45; letter-sp
 .error-notice { border: 1px solid #fecaca; color: #b91c1c; background: #fef2f2; border-radius: 11px; padding: 13px 16px; margin-bottom: 20px; font-size: 13px; }
 .workspace { display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 29px; align-items: start; }
 .find-column, .controls-column { min-width: 0; }
+.leave-register-card { border: 1px solid var(--line); background: #f8fbff; border-radius: var(--radius); padding: 20px 22px; margin-bottom: 26px; }
+.leave-register-card .section-heading { align-items: flex-start; margin-bottom: 8px; }
+.leave-register-copy { margin: 0; color: var(--muted); font-size: 11px; }
+.leave-register-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; margin-top: 15px; }
+.leave-register-controls select { min-width: 0; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; font: inherit; font-size: 12px; }
+.leave-item-list { display: flex; flex-wrap: wrap; gap: 7px; min-height: 24px; margin-top: 12px; color: var(--muted); font-size: 10px; }
+.leave-item-chip { border: 1px solid #bfdbfe; border-radius: 100px; background: white; color: #1d4ed8; padding: 4px 9px; font: inherit; font-size: 10px; }
+.leave-item-chip:not(:disabled):hover { background: #dbeafe; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 16px; }
 h2 { font-size: 17px; letter-spacing: -.5px; font-weight: 700; line-height: 1.4; margin: 0; }
 .count { background: #f4f8ff; border-radius: 6px; color: #345b8c; padding: 2px 6px; margin-left: 5px; vertical-align: 1px; font-size: 11px; font-weight: 600; }

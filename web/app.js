@@ -7,6 +7,17 @@ const labels = { car_key: '차키', carkey: '차키', airpods: '에어팟', earp
 const icons = { car_key: 'key', carkey: 'key', airpods: 'airpods', earphones: 'airpods', wallet: 'wallet' };
 const descriptions = { car_key: '외출할 때 함께', carkey: '외출할 때 함께', airpods: '나만의 작은 음악', earphones: '나만의 작은 음악', wallet: '외출할 때 챙기는 지갑' };
 const stateLabels = { visible: '마지막 화면에서 확인', occluded: '가려진 상태로 기록', uncertain: '위치 확인 필요' };
+const modelItems = [
+  'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic_light',
+  'fire_hydrant', 'stop_sign', 'parking_meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+  'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+  'skis', 'snowboard', 'sports_ball', 'kite', 'baseball_bat', 'baseball_glove', 'skateboard', 'surfboard',
+  'tennis_racket', 'bottle', 'wine_glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+  'sandwich', 'orange', 'broccoli', 'carrot', 'hot_dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+  'potted_plant', 'bed', 'dining_table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
+  'cell_phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 'scissors',
+  'teddy_bear', 'hair_drier', 'toothbrush', 'car_key', 'wallet', 'earphones',
+];
 const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [], leaveItems: new Set() };
 const $ = id => document.getElementById(id);
 let toastTimer;
@@ -61,6 +72,57 @@ function showError(message = '') {
   $('load-error').hidden = !message;
 }
 
+function leaveItemLabel(item) {
+  const label = itemLabel(item);
+  return label === item.replaceAll('_', ' ') ? item : `${label} (${item})`;
+}
+
+function renderLeaveRegistration() {
+  const select = $('leave-item-select');
+  const current = select.value;
+  const fragment = document.createDocumentFragment();
+  for (const item of modelItems) {
+    const option = document.createElement('option');
+    option.value = item;
+    option.textContent = leaveItemLabel(item);
+    option.disabled = state.leaveItems.has(item);
+    fragment.append(option);
+  }
+  select.replaceChildren(fragment);
+  select.value = modelItems.includes(current) && !state.leaveItems.has(current) ? current : modelItems.find(item => !state.leaveItems.has(item)) ?? '';
+  $('leave-item-add-button').disabled = !select.value || state.busy.has('leave');
+
+  const registered = [...state.leaveItems].sort((a, b) => modelItems.indexOf(a) - modelItems.indexOf(b));
+  const list = $('leave-item-list');
+  if (!registered.length) {
+    list.textContent = '등록된 외출 확인 물건이 없어요.';
+    return;
+  }
+  const chips = document.createDocumentFragment();
+  for (const item of registered) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'leave-item-chip';
+    button.disabled = state.busy.has('leave');
+    button.textContent = `${leaveItemLabel(item)} ×`;
+    button.setAttribute('aria-label', `${leaveItemLabel(item)} 외출 확인 해제`);
+    button.addEventListener('click', () => setLeaveItems([...state.leaveItems].filter(entry => entry !== item), `${itemLabel(item)} 외출 알림 해제`));
+    chips.append(button);
+  }
+  list.replaceChildren(chips);
+}
+
+function setLeaveItems(items, description) {
+  void command('leave', 'key', description, async () => {
+    state.leaveItems = new Set(await api.setLeaveItems(items));
+  }, () => { renderItems(); updateButtons(); }).finally(() => {
+    renderLeaveRegistration();
+    renderItems();
+    updateButtons();
+  });
+  renderLeaveRegistration();
+}
+
 function renderItems() {
   const focusedItem = $('item-list').contains(document.activeElement) ? document.activeElement.dataset.item : null;
   const query = $('search-input').value.trim().toLocaleLowerCase('ko-KR');
@@ -104,10 +166,6 @@ function updateButtons() {
   $('drawer-open-button').disabled = state.busy.has('drawer');
   $('buzzer-on-button').disabled = state.busy.has('buzzer');
   $('buzzer-off-button').disabled = state.busy.has('buzzer');
-  const registered = state.selected !== null && state.leaveItems.has(state.selected);
-  $('leave-button').disabled = state.selected === null || state.busy.has('leave');
-  $('leave-button').setAttribute('aria-pressed', String(registered));
-  $('leave-button-label').textContent = registered ? '외출 알림 해제' : '외출 알림 등록';
 }
 
 function clearPhoto(title) {
@@ -193,6 +251,7 @@ async function refreshItems() {
     const [items, leaveItems] = await Promise.all([api.listItems(), api.getLeaveItems().catch(() => null)]);
     state.items = items;
     if (leaveItems) state.leaveItems = new Set(leaveItems);
+    renderLeaveRegistration();
     showError();
     if (items.length) await selectItem(items.some(record => record.item === state.selected) ? state.selected : items[0].item);
     else { ++state.detailSequence; state.selected = null; state.record = null; state.detailLoading = false; renderItems(); renderDetail(); }
@@ -266,14 +325,10 @@ $('drawer-open-button').addEventListener('click', () => {
   const n = state.drawer;
   command('drawer', 'drawer', `${n}번 서랍 열기`, () => api.openDrawer(n));
 });
-$('leave-button').addEventListener('click', () => {
-  const item = state.selected;
-  if ($('leave-button').disabled || item === null) return;
-  const registered = state.leaveItems.has(item);
-  const next = registered ? [...state.leaveItems].filter(entry => entry !== item) : [...state.leaveItems, item];
-  command('leave', 'key', `${itemLabel(item)} 외출 알림 ${registered ? '해제' : '등록'}`, async () => {
-    state.leaveItems = new Set(await api.setLeaveItems(next));
-  }, () => { renderItems(); updateButtons(); });
+$('leave-item-add-button').addEventListener('click', () => {
+  const item = $('leave-item-select').value;
+  if (!item || state.leaveItems.has(item)) return;
+  setLeaveItems([...state.leaveItems, item], `${itemLabel(item)} 외출 알림 등록`);
 });
 $('related-drawer-button').addEventListener('click', () => {
   if (state.record?.drawer_id === null || !state.record) return;
@@ -295,4 +350,5 @@ if (!isDemo) {
   $('footer-mode').textContent = '서버 모드 · 요청 접수와 실제 동작은 별도';
   $('buzzer-status').textContent = '실제 소리 상태 미확인';
 }
+renderLeaveRegistration();
 refreshItems();
