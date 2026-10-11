@@ -69,8 +69,9 @@
             <span class="scene-target" id="scene-target" hidden><span></span><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span id="target-label">차키</span></span>
           </div>
           <div class="detail-body"><div class="selected-summary"><div><h3 id="selected-name">물건을 선택해 주세요</h3><p id="selected-location">마지막 기록을 확인할 수 있어요.</p></div><span id="relative-time" class="time-pill">—</span></div>
-            <dl class="record-metadata"><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg>마지막 목격</dt><dd id="seen-at">—</dd></div><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-pin"/></svg>기록 위치</dt><dd id="record-location">—</dd></div></dl>
+            <dl class="record-metadata"><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg><span id="record-time-label">마지막 목격</span></dt><dd id="seen-at">—</dd></div><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-pin"/></svg>기록 위치</dt><dd id="record-location">—</dd></div></dl>
             <button class="button button-primary detail-action" id="aim-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span>레이저로 위치 안내</span><svg class="icon action-arrow" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+            <button class="button button-secondary detail-action speech-action" id="record-speech-button" type="button" disabled hidden><svg class="icon" aria-hidden="true"><use href="#icon-sound"/></svg><span>보관 시각 읽어주기</span></button>
             <button class="text-button" id="related-drawer-button" type="button" hidden>기록된 서랍 선택하기</button>
             <p class="action-help" id="aim-help">선택한 물건의 마지막 위치로 안내를 요청해요.</p>
           </div>

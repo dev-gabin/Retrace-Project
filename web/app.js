@@ -21,6 +21,7 @@ const drawerItemChoices = [
 const state = { items: [], selected: null, record: null, drawer: 1, detailLoading: false, detailSequence: 0, busy: new Set(), activity: [], leaveItems: new Set() };
 const $ = id => document.getElementById(id);
 let toastTimer;
+let activeSpeech = null;
 
 function itemLabel(item) {
   return state.items.find(record => record.item === item)?.display_name ?? labels[item] ?? item.replaceAll('_', ' ');
@@ -56,8 +57,87 @@ function relativeTime(value) {
 
 function locationText(record) {
   if (!record.seen_at) return '아직 목격 기록이 없어요';
-  if (record.drawer_id !== null) return `${record.drawer_id}번 서랍에 기록되어 있어요`;
+  if (record.drawer_id !== null) return `${record.drawer_id}번 서랍에 보관 등록했어요`;
   return record.pos_x === null ? '위치 정보 없음' : '카메라 감지 영역에 기록되어 있어요';
+}
+
+function spokenTime(value, now = new Date()) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const formatter = new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true, timeZone: 'Asia/Seoul' });
+  const parts = value => Object.fromEntries(formatter.formatToParts(value).map(part => [part.type, part.value]));
+  const time = parts(date);
+  const dayKey = value => `${value.year}-${value.month}-${value.day}`;
+  const day = dayKey(time) === dayKey(parts(now)) ? '오늘' : dayKey(time) === dayKey(parts(new Date(now.getTime() - 86400000))) ? '어제' : `${time.year}년 ${time.month}월 ${time.day}일`;
+  return `${day} ${time.dayPeriod} ${Number(time.hour)}시${Number(time.minute) ? ` ${Number(time.minute)}분` : ''}쯤`;
+}
+
+function spokenDrawerNumber(n) {
+  return ['', '일 번', '이 번', '삼 번', '사 번', '오 번', '육 번'][n] ?? `${n}번`;
+}
+
+function spokenRecord(record, now = new Date()) {
+  if (!record || record.drawer_id === null) return '';
+  const when = spokenTime(record?.seen_at, now);
+  if (!when) return '';
+  const name = itemLabel(record.item);
+  const last = name.charCodeAt(name.length - 1);
+  const topic = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0 ? '은' : '는';
+  const location = `${spokenDrawerNumber(record.drawer_id)} 서랍에 보관 등록했어요.`;
+  return `${isDemo ? '샘플 기록입니다. ' : ''}${name}${topic} ${when} ${location}`;
+}
+
+function speechAvailable() {
+  return Boolean(globalThis.speechSynthesis && typeof globalThis.SpeechSynthesisUtterance === 'function');
+}
+
+function stopRecordSpeech() {
+  if (!activeSpeech) return;
+  activeSpeech = null;
+  globalThis.speechSynthesis.cancel();
+  updateButtons();
+}
+
+function readRecord(record, { automatic = false } = {}) {
+  speakText(spokenRecord(record), { automatic });
+}
+
+function readDrawerRegistration(name, n, seenAt) {
+  const last = name.charCodeAt(name.length - 1);
+  const subject = last >= 0xac00 && last <= 0xd7a3 && (last - 0xac00) % 28 !== 0 ? '이' : '가';
+  const when = spokenTime(seenAt);
+  const text = `${isDemo ? '샘플 등록입니다. ' : ''}${name}${subject} ${when ? `${when} ` : ''}${spokenDrawerNumber(n)} 서랍에 등록됐어요.`;
+  try { speakText(text, { automatic: true }); }
+  catch { showToast('보관 등록은 완료됐지만 음성을 재생하지 못했어요.', true); }
+}
+
+function speakText(text, { automatic = false } = {}) {
+  if (!text) return;
+  if (!speechAvailable()) {
+    if (!automatic) showToast('이 브라우저에서는 음성 읽어주기를 사용할 수 없어요.', true);
+    return;
+  }
+  stopRecordSpeech();
+  const utterance = new globalThis.SpeechSynthesisUtterance(text);
+  utterance.lang = 'ko-KR';
+  utterance.rate = 1;
+  const voice = globalThis.speechSynthesis.getVoices().find(entry => /^ko(?:-|$)/i.test(entry.lang));
+  if (voice) utterance.voice = voice;
+  const finish = () => {
+    if (activeSpeech !== utterance) return false;
+    activeSpeech = null;
+    updateButtons();
+    return true;
+  };
+  utterance.onend = finish;
+  utterance.onerror = event => {
+    if (finish() && !['canceled', 'interrupted'].includes(event.error)) showToast('음성을 재생하지 못했어요. 읽어주기 버튼을 눌러 다시 시도해 주세요.', true);
+  };
+  activeSpeech = utterance;
+  updateButtons();
+  try { globalThis.speechSynthesis.speak(utterance); }
+  catch { utterance.onerror({ error: 'synthesis-failed' }); }
 }
 
 function showToast(message, error = false) {
@@ -168,7 +248,7 @@ function renderItems() {
       badge.textContent = '외출 알림';
       button.append(badge);
     }
-    button.addEventListener('click', () => selectItem(record.item, { navigateToDrawer: true }));
+    button.addEventListener('click', () => selectItem(record.item, { navigateToDrawer: true, readAloud: record.drawer_id !== null }));
     fragment.append(button);
   }
   $('item-list').replaceChildren(fragment);
@@ -179,6 +259,10 @@ function renderItems() {
 function updateButtons() {
   const record = state.record;
   $('aim-button').disabled = state.detailLoading || !record || record.seen_at === null || record.pos_x === null || record.drawer_id !== null || state.busy.has('aim');
+  $('record-speech-button').hidden = !record || record.drawer_id === null;
+  $('record-speech-button').disabled = state.detailLoading || !record?.seen_at || record.drawer_id === null || !speechAvailable();
+  $('record-speech-button').querySelector('span').textContent = activeSpeech ? '읽기 중지' : '보관 시각 읽어주기';
+  $('record-speech-button').title = speechAvailable() ? '선택한 서랍 물건의 보관 등록 시각을 읽어요' : '이 브라우저에서는 음성 읽어주기를 지원하지 않아요';
   $('drawer-open-button').disabled = state.busy.has('drawer');
   const storageItem = $('drawer-item-select').value;
   $('drawer-item-select').disabled = state.busy.has('drawer');
@@ -204,6 +288,7 @@ function clearPhoto(title) {
 function renderDetail() {
   const record = state.record;
   $('detail-card').setAttribute('aria-busy', String(state.detailLoading));
+  $('record-time-label').textContent = record && record.drawer_id !== null ? '보관 등록 시각' : '마지막 목격';
   if (!record) {
     clearPhoto(state.detailLoading ? '마지막 기록을 불러오는 중이에요' : '표시할 기록이 없어요');
     $('selected-name').textContent = state.selected ? itemLabel(state.selected) : '물건을 선택해 주세요';
@@ -223,7 +308,7 @@ function renderDetail() {
   $('relative-time').textContent = relativeTime(record.seen_at);
   $('seen-at').textContent = record.seen_at ? new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' }).format(new Date(record.seen_at)) : '기록 없음';
   $('record-location').textContent = record.drawer_id !== null ? `${record.drawer_id}번 서랍` : record.pos_x !== null ? `이미지 좌표 (${record.pos_x}, ${record.pos_y})` : '위치 정보 없음';
-  $('record-state').textContent = record.seen_at ? stateLabels[record.state] : '기록 없음';
+  $('record-state').textContent = record.drawer_id !== null ? '서랍 보관 등록' : record.seen_at ? stateLabels[record.state] : '기록 없음';
   $('record-state').className = `record-state ${record.state}`;
   $('related-drawer-button').hidden = record.drawer_id === null;
   $('related-drawer-button').textContent = `${record.drawer_id}번 서랍 선택하기`;
@@ -247,7 +332,8 @@ function renderDetail() {
   updateButtons();
 }
 
-async function selectItem(item, { navigateToDrawer = false } = {}) {
+async function selectItem(item, { navigateToDrawer = false, readAloud = false } = {}) {
+  stopRecordSpeech();
   const sequence = ++state.detailSequence;
   state.selected = item;
   state.record = null;
@@ -267,11 +353,13 @@ async function selectItem(item, { navigateToDrawer = false } = {}) {
       state.detailLoading = false;
       renderDetail();
       if (navigateToDrawer && state.record && state.record.drawer_id !== null) showItemDrawer(state.record);
+      if (readAloud && state.record && state.record.drawer_id !== null) readRecord(state.record, { automatic: true });
     }
   }
 }
 
 async function refreshItems() {
+  stopRecordSpeech();
   $('refresh-button').disabled = true;
   $('refresh-button').classList.add('is-loading');
   $('item-list').setAttribute('aria-busy', 'true');
@@ -284,6 +372,7 @@ async function refreshItems() {
     showError();
     if (items.length) await selectItem(items.some(record => record.item === state.selected) ? state.selected : items[0].item);
     else { ++state.detailSequence; state.selected = null; state.record = null; state.detailLoading = false; renderItems(); renderDetail(); }
+    return items;
   } catch (error) {
     showError(`기록을 새로 불러오지 못했어요. ${error.message}${state.items.length ? ' 이전에 조회한 기록을 표시하고 있어요.' : ''}`);
     if (!state.items.length) {
@@ -353,6 +442,12 @@ function showItemDrawer(record) {
 
 $('search-input').addEventListener('input', renderItems);
 $('refresh-button').addEventListener('click', refreshItems);
+$('record-speech-button').addEventListener('click', () => {
+  if ($('record-speech-button').disabled || !state.record) return;
+  if (activeSpeech) stopRecordSpeech();
+  else readRecord(state.record);
+});
+globalThis.addEventListener('pagehide', stopRecordSpeech);
 $('aim-button').addEventListener('click', () => {
   if ($('aim-button').disabled || !state.record) return;
   const item = state.record.item;
@@ -367,10 +462,13 @@ $('drawer-store-button').addEventListener('click', () => {
   if ($('drawer-store-button').disabled) return;
   const item = $('drawer-item-select').value;
   const n = state.drawer;
-  command('drawer', 'drawer', `${itemLabel(item)} ${n}번 서랍 보관 등록`, async () => {
+  const name = itemLabel(item);
+  let registeredAt;
+  command('drawer', 'drawer', `${name} ${n}번 서랍 보관 등록`, async () => {
     await api.storeDrawer(item, n);
-    await refreshItems();
-  });
+    const items = await refreshItems();
+    registeredAt = items?.find(record => record.item === item && record.drawer_id === n)?.seen_at;
+  }, () => readDrawerRegistration(name, n, registeredAt));
 });
 $('drawer-item-select').addEventListener('change', updateButtons);
 $('drawer-custom-name').addEventListener('input', updateButtons);
@@ -378,12 +476,14 @@ $('drawer-custom-add-button').addEventListener('click', () => {
   if ($('drawer-custom-add-button').disabled) return;
   const name = $('drawer-custom-name').value.trim();
   const n = state.drawer;
+  let registeredAt;
   command('drawer', 'drawer', `${name} ${n}번 서랍 추가·보관`, async () => {
     const result = await api.createDrawerItem(name, n);
     $('drawer-custom-name').value = '';
-    await refreshItems();
+    const items = await refreshItems();
+    registeredAt = items?.find(record => record.item === result.item && record.drawer_id === n)?.seen_at;
     if (state.items.some(record => record.item === result.item)) $('drawer-item-select').value = result.item;
-  });
+  }, () => readDrawerRegistration(name, n, registeredAt));
 });
 $('drawer-custom-name').addEventListener('keydown', event => {
   if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); $('drawer-custom-add-button').click(); }
