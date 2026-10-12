@@ -199,8 +199,13 @@ void render() {
     size_t slots = itemCount ? itemCount : 1;
     size_t seenSlots = lastSeenCount ? lastSeenCount : 1;
     size_t total = seenSlots + 2 + (morning ? slots : 0) + (forecastFresh && bringUmbrella ? 1 : 0);
+    bool wasRecordUpdated = recordUpdated;
     bool priorityRecord = advanceDisplayPage(millis(), recordUpdated, recordUpdatedAt,
                                             page, pageAt, total, pageIntervalMs, newRecordHoldMs);
+    if (wasRecordUpdated && !recordUpdated) {
+        page = seenSlots;
+        pageAt = millis();
+    }
     String marker = WiFi.status() != WL_CONNECTED ? "Offline" : "Weather old";
     if (page < seenSlots) {
         bool fresh = lastSeenOkay && WiFi.status() == WL_CONNECTED
