@@ -152,7 +152,7 @@ class DeviceEventHandlerTest(LeaveAlertTestCase):
         handler, verifier, store, _, notifier, _ = self.make_handler([], ["keyboard"])
         self.confirm(handler, verifier, [
             {"item_id": "car_key", "confidence": 0.95, "center": (320, 240)},
-            {"item_id": "keyboard", "confidence": 0.59, "center": (100, 100)},
+            {"item_id": "keyboard", "confidence": 0.49, "center": (100, 100)},
         ])
         self.assertEqual((store.commands, notifier.sent), ([], []))
 

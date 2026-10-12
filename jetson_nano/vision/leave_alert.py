@@ -57,7 +57,7 @@ class LeaveVerifier:
         return cls(
             seconds=float(os.environ.get("RETRACE_LEAVE_CHECK_SECONDS", "3.0")),
             confidence=float(
-                os.environ.get("RETRACE_LEAVE_CHECK_CONFIDENCE", "0.60")
+                os.environ.get("RETRACE_LEAVE_CHECK_CONFIDENCE", "0.50")
             ),
             required_hits=int(os.environ.get("RETRACE_LEAVE_CHECK_HITS", "3")),
         )
