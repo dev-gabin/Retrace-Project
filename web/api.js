@@ -96,10 +96,6 @@ export function createApi({ mode = 'demo', apiBaseUrl = '', timeoutMs = 8000, fe
       if (!Number.isInteger(n) || n < 1 || n > 6) throw new ApiError('INVALID_DRAWER', '서랍 번호는 1~6이어야 합니다.');
       return acknowledged(mode === 'demo' ? await demo.openDrawer(n) : await request(`/api/drawers/${n}/open`, { method: 'POST', body: {} }));
     },
-    async setBuzzer(enabled) {
-      if (typeof enabled !== 'boolean') throw new ApiError('INVALID_BUZZER', '부저 요청은 켜기 또는 끄기로 정해야 합니다.');
-      return acknowledged(mode === 'demo' ? await demo.setBuzzer(enabled) : await request('/api/buzzer', { method: 'POST', body: { enabled } }));
-    },
     snapshotUrl(record) {
       if (record.snapshot === null) return null;
       if (!snapshotPath(record.snapshot)) throw new ApiError('BAD_RESPONSE', '사진 경로가 올바르지 않습니다.');

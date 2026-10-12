@@ -7,13 +7,10 @@ export const demoItems = [
 ];
 
 export function createDemoTransport() {
-  let buzzerEnabled = false;
   return {
     async listItems() { return { items: structuredClone(demoItems) }; },
     async getItem(item) { return structuredClone(demoItems.find(record => record.item === item)); },
     async aim() { return { ok: true }; },
     async openDrawer() { return { ok: true }; },
-    async setBuzzer(enabled) { buzzerEnabled = enabled; return { ok: true }; },
-    get buzzerEnabled() { return buzzerEnabled; },
   };
 }
