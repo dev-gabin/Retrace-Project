@@ -168,6 +168,9 @@ class HttpApiTest(unittest.TestCase):
     def test_snapshot_and_static_web_are_served(self) -> None:
         with urlopen(self.base_url + "/", timeout=2) as response:
             self.assertEqual(response.read(), b"Retrace test")
+            self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+            self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+            self.assertIn("default-src 'self'", response.headers["Content-Security-Policy"])
         with urlopen(self.base_url + "/snapshots/keyboard.jpg", timeout=2) as response:
             self.assertEqual(response.read(), b"jpeg-test")
         with self.assertRaises(HTTPError) as caught:

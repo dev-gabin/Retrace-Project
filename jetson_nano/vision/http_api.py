@@ -23,6 +23,7 @@ from vision.aim_mapper import AimMapper
 _ITEM_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 _DRAWER_PATH = re.compile(r"^/api/drawers/([1-6])/open$")
 _MAX_BODY_SIZE = 1024
+_REQUEST_TIMEOUT_SECONDS = 10.0
 
 
 class HttpApiError(RuntimeError):
@@ -106,6 +107,26 @@ class RetraceHttpServer:
 
         class Handler(BaseHTTPRequestHandler):
             server_version = "RetraceHTTP/1.0"
+
+            def setup(self) -> None:
+                super().setup()
+                self.connection.settimeout(_REQUEST_TIMEOUT_SECONDS)
+
+            def end_headers(self) -> None:
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("X-Frame-Options", "DENY")
+                self.send_header("Referrer-Policy", "no-referrer")
+                self.send_header(
+                    "Content-Security-Policy",
+                    "default-src 'self'; img-src 'self' data:; "
+                    "connect-src 'self'; script-src 'self'; style-src 'self'; "
+                    "object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+                )
+                self.send_header(
+                    "Permissions-Policy",
+                    "camera=(), microphone=(), geolocation=()",
+                )
+                super().end_headers()
 
             def do_GET(self) -> None:  # noqa: N802 - stdlib callback name
                 try:

@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -24,6 +25,8 @@
 #define MAX_LINE_SIZE 4096
 #define MAX_CREDENTIALS 256
 #define PING_TIMEOUT_MS 3000
+#define LOGIN_TIMEOUT_SECONDS 5
+#define SEND_TIMEOUT_SECONDS 5
 
 typedef struct {
     char id[CLIENT_ID_SIZE];
@@ -69,6 +72,12 @@ static int send_all(int fd, const char *data, size_t size)
         sent += (size_t)n;
     }
     return 0;
+}
+
+static int set_socket_timeout(int fd, int option, long seconds)
+{
+    struct timeval timeout = {.tv_sec = seconds, .tv_usec = 0};
+    return setsockopt(fd, SOL_SOCKET, option, &timeout, sizeof(timeout));
 }
 
 static int send_client_line(ClientInfo *client, const char *line)
@@ -680,10 +689,23 @@ int server_run(const ServerConfig *config, const RtConfig *database)
         }
         if (inet_ntop(AF_INET, &peer.sin_addr, ip, sizeof(ip)) == NULL)
             snprintf(ip, sizeof(ip), "unknown");
+        if (set_socket_timeout(client_fd, SO_RCVTIMEO,
+                               LOGIN_TIMEOUT_SECONDS) != 0 ||
+            set_socket_timeout(client_fd, SO_SNDTIMEO,
+                               SEND_TIMEOUT_SECONDS) != 0) {
+            perror("setsockopt client timeout");
+            close(client_fd);
+            continue;
+        }
         if (read_login(client_fd, id, sizeof(id), credentials,
                        credential_count) != 0) {
             static const char rejected[] = "[SERVER]Authentication Error!\n";
             (void)send_all(client_fd, rejected, sizeof(rejected) - 1);
+            close(client_fd);
+            continue;
+        }
+        if (set_socket_timeout(client_fd, SO_RCVTIMEO, 0) != 0) {
+            perror("clear client receive timeout");
             close(client_fd);
             continue;
         }
