@@ -262,6 +262,8 @@ function renderItems() {
 function updateButtons() {
   const record = state.record;
   $('photo-button').disabled = state.detailLoading || !record || !api.snapshotUrl(record) || $('snapshot-image').hidden;
+  $('aim-button').disabled = state.detailLoading || state.busy.has('aim') || !record || record.drawer_id !== null || record.pos_x === null || record.pos_y === null;
+  $('aim-help').textContent = record?.drawer_id != null ? '서랍 보관 물건은 서랍을 열어 확인해 주세요.' : '저장된 마지막 좌표로 안내해요. 목격 후 물건이 이동했으면 위치가 다를 수 있어요.';
   $('record-speech-button').disabled = state.detailLoading || !record?.seen_at || !speechAvailable();
   $('record-speech-button').querySelector('span').textContent = activeSpeech ? '읽기 중지' : '보관·확인 시각 읽어주기';
   $('record-speech-button').title = speechAvailable() ? '선택한 물건의 보관 등록 또는 마지막 확인 시각을 읽어요' : '이 브라우저에서는 음성 읽어주기를 지원하지 않아요';
@@ -448,6 +450,11 @@ function showItemDrawer(record) {
 
 $('search-input').addEventListener('input', renderItems);
 $('refresh-button').addEventListener('click', refreshItems);
+$('aim-button').addEventListener('click', () => {
+  if ($('aim-button').disabled || !state.record) return;
+  const item = state.record.item;
+  command('aim', 'target', `${itemLabel(item)} 레이저 안내`, () => api.aim(item));
+});
 $('record-speech-button').addEventListener('click', () => {
   if ($('record-speech-button').disabled || !state.record) return;
   if (activeSpeech) stopRecordSpeech();

@@ -9,6 +9,7 @@ from communication.server_events import ServerEventError, ServerEventListener
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenStore
 from record.leave_items import LeaveItems
+from vision.aim_mapper import AimMapper
 from vision.detector import YoloDetector
 from vision.http_api import RetraceHttpServer
 from vision.leave_alert import DeviceEventHandler, LeaveVerifier
@@ -82,11 +83,19 @@ def main() -> None:
         return
 
     leave_items = LeaveItems(storage.data_dir / "leave_items.json")
+    frame_height, frame_width = warmup_frame.shape[:2]
+    mapper = None
+    try:
+        mapper = AimMapper.from_env(frame_width, frame_height)
+    except ValueError as error:
+        print(f"[LASER] 좌표 보정 오류로 웹 레이저 안내 끔: {error}")
     try:
         http_server = RetraceHttpServer.from_env(
             storage,
             REPOSITORY_DIR / "web",
             leave_items,
+            stm32=stm32,
+            mapper=mapper,
         )
         http_server.start()
     except (OSError, ValueError) as error:

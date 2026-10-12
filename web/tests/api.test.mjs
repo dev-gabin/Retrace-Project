@@ -115,7 +115,7 @@ test('샘플 모드는 모든 조회·제어에서 네트워크를 사용하지 
   assert.deepEqual(items.map(item => item.item), ['carkey', 'airpods', 'wallet']);
   items[0].pos_x = 999;
   assert.equal((await api.getItem('carkey')).pos_x, 412);
-  for (const item of items) await assert.rejects(api.aim(item.item), hasCode('LASER_DISABLED'));
+  for (const item of items) assert.deepEqual(await api.aim(item.item), { ok: true });
   for (let n = 1; n <= 6; n++) await api.openDrawer(n);
   await api.setBuzzer(true);
   await api.setBuzzer(false);
@@ -133,10 +133,13 @@ test('잘못된 물건·서랍·부저 값은 요청 전에 거절한다', async
   assert.equal(calls.length, 0);
 });
 
-test('예전 레이저 API도 실제 서버에 제어 요청을 보내지 않는다', async () => {
+test('레이저 안내는 선택한 물건의 aim 경로로 요청한다', async () => {
   const { api, calls } = liveWith({ ok: true });
-  await assert.rejects(api.aim('carkey'), error => hasCode('LASER_DISABLED')(error) && error.status === 410);
-  assert.equal(calls.length, 0);
+  assert.deepEqual(await api.aim('carkey'), { ok: true });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/api\/items\/carkey\/aim$/);
+  assert.equal(calls[0].method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].body), {});
 });
 
 test('기록 없음·서랍 기록·UTC 시각·사진 없는 기록을 허용한다', () => {

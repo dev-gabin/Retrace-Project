@@ -85,6 +85,8 @@ class HttpApiTest(unittest.TestCase):
         self.stm32 = FakeStm32()
         self.server = RetraceHttpServer(
             self.store,  # type: ignore[arg-type]
+            stm32=self.stm32,
+            mapper=types.SimpleNamespace(map=lambda x, y: (85, 42)),
             web_root=self.web_root,
             host="127.0.0.1",
             port=0,
@@ -118,12 +120,9 @@ class HttpApiTest(unittest.TestCase):
         self.assertEqual(record["pos_x"], 320)
         self.assertIsNone(record["drawer_id"])
 
-    def test_retired_laser_keeps_drawer_and_buzzer_commands(self) -> None:
-        with self.assertRaises(HTTPError) as caught:
-            self.request("/api/items/keyboard/aim", {})
-        self.assertEqual(caught.exception.code, 410)
-        self.assertEqual(json.load(caught.exception)["error"]["code"], "LASER_DISABLED")
-        self.assertEqual(self.stm32.points, [])
+    def test_laser_keeps_drawer_and_buzzer_commands(self) -> None:
+        self.assertEqual(self.request("/api/items/keyboard/aim", {}), (200, {"ok": True}))
+        self.assertEqual(self.stm32.points, [(85, 42, 5.0)])
         self.assertEqual(self.request("/api/drawers/6/open", {}), (200, {"ok": True}))
         self.assertEqual(self.request("/api/buzzer", {"enabled": True}), (200, {"ok": True}))
         self.assertEqual(self.request("/api/buzzer", {"enabled": False}), (200, {"ok": True}))
@@ -180,12 +179,21 @@ class HttpApiTest(unittest.TestCase):
             urlopen(self.base_url + "/snapshots/%2e%2e/index.html", timeout=2)
         self.assertEqual(caught.exception.code, 400)
 
-    def test_laser_is_retired_even_without_coordinates(self) -> None:
+    def test_laser_rejects_missing_coordinates(self) -> None:
         with self.assertRaises(HTTPError) as caught:
             self.request("/api/items/wallet/aim", {})
-        self.assertEqual(caught.exception.code, 410)
+        self.assertEqual(caught.exception.code, 409)
         error = json.load(caught.exception)
-        self.assertEqual(error["error"]["code"], "LASER_DISABLED")
+        self.assertEqual(error["error"]["code"], "NO_POSITION")
+        self.assertEqual(self.stm32.points, [])
+
+    def test_laser_rejects_unconfigured_hardware(self) -> None:
+        self.server.mapper = None
+        with self.assertRaises(HTTPError) as caught:
+            self.request("/api/items/keyboard/aim", {})
+        self.assertEqual(caught.exception.code, 503)
+        self.assertEqual(json.load(caught.exception)["error"]["code"], "LASER_UNAVAILABLE")
+        self.assertEqual(self.stm32.points, [])
 
     def test_unknown_item_returns_not_found(self) -> None:
         with self.assertRaises(HTTPError) as caught:
@@ -203,6 +211,8 @@ class ManualDrawerTest(unittest.TestCase):
         self.store = FakeStore(Path(self.temporary.name))
         self.server = RetraceHttpServer.__new__(RetraceHttpServer)
         self.server.storage = self.store
+        self.server.stm32 = None
+        self.server.mapper = None
         self.server.drawer_target = "DRAWER"
         self.server.drawer_items = DrawerItems(self.store.data_dir / "drawer_items.json")
         self.body = None
@@ -215,12 +225,12 @@ class ManualDrawerTest(unittest.TestCase):
         data = json.dumps(body).encode()
         self.server._handle_post(types.SimpleNamespace(path=path, headers={"Content-Length": str(len(data))}, rfile=io.BytesIO(data)))
 
-    def test_legacy_aim_route_never_calls_hardware(self):
-        for item in ["keyboard", "wallet", "missing_item"]:
+    def test_unconfigured_aim_route_never_calls_hardware(self):
+        for item, status, code in [("keyboard", 503, "LASER_UNAVAILABLE"), ("wallet", 409, "NO_POSITION"), ("missing_item", 404, "ITEM_NOT_FOUND")]:
             with self.subTest(item=item), self.assertRaises(HttpApiError) as caught:
                 self.post(f"/api/items/{item}/aim", {})
-            self.assertEqual(caught.exception.status, 410)
-            self.assertEqual(caught.exception.code, "LASER_DISABLED")
+            self.assertEqual(caught.exception.status, status)
+            self.assertEqual(caught.exception.code, code)
         self.assertEqual(self.store.commands, [])
 
     def test_unseen_storage_listing_and_persistence(self):
