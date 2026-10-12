@@ -6,7 +6,6 @@ ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 CONF="${ROOT}/clientID.conf"
 EXAMPLE="${ROOT}/clientID.conf.example"
 RFCOMM_BIN="${ROOT}/bluetooth/client_bluetooth"
-BLE_BIN="${ROOT}/ble/client_ble"
 
 if [[ ! -f "${CONF}" ]]; then
     cp "${EXAMPLE}" "${CONF}"
@@ -62,10 +61,6 @@ launch() {
             need CHANNEL "${channel}"
             supervise "${section}" "${client_id}" "${secret}" \
                 "${RFCOMM_BIN}" "${client_id}" "${mac}" "${channel}" &
-            ;;
-        BLE)
-            supervise "${section}" "${client_id}" "${secret}" \
-                "${BLE_BIN}" "${client_id}" "${mac}" &
             ;;
         *)
             printf '[%s] unsupported TYPE=%s\n' "${section}" "${type}" >&2

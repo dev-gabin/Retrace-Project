@@ -3,7 +3,7 @@
 > 각 보드가 주고받는 메시지 약속입니다. **보내는 쪽과 받는 쪽 모두 이 문서를 기준으로 구현합니다.**  
 > 문서와 다르게 동작하면 **문서와 다른 쪽이 수정**합니다. 변경이 필요하면 문서를 먼저 고치고 서로 공유합니다.
 >
-> 버전: **v0.6** — Jetson 저장 데이터·C Storage API는 `Retrace_API_Guide_v2.pdf` 기준이며, HTTP API·JSON은 초안입니다. 남은 확정 항목은 맨 아래 참고합니다.
+> 버전: **v0.7** — Jetson 저장 데이터·C Storage API는 `Retrace_API_Guide_v2.pdf` 기준이며, HTTP API·JSON은 초안입니다. 남은 확정 항목은 맨 아래 참고합니다.
 > 보드 핀 배정은 [pinmap.md](pinmap.md), 실행·검증 항목은 [통합 테스트 체크리스트](classroom_test_checklist.md)를 참고합니다.
 
 ---
@@ -15,7 +15,6 @@
 | Jetson ↔ STM32 #1 메인 유닛 | USB Serial (VCP) | `stm32/main_unit` | `Stm32Link` |
 | Jetson ↔ STM32 #2 서랍 | Bluetooth (HC-06) | `stm32/drawer` | `DrawerLink` |
 | Jetson ↔ ESP32 #1 현관등 (LOLIN D32) | Wi-Fi · MQTT | `esp32/entrance_node` | `MqttLink` |
-| Jetson → ESP32 #2 부저 태그 (ESP32-C3) | BLE | `esp32/buzzer_tag` | `BleBuzzer` |
 | Jetson → 스마트폰 | ntfy (HTTP) | - | `PhoneNotifier` |
 | Web/PWA ↔ Jetson | HTTP | - | `Server` |
 
@@ -199,34 +198,7 @@ mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m ALERT
 
 ---
 
-## 5. Jetson → ESP32 #2 부저 태그 (BLE)
-
-| 항목 | 값 |
-|---|---|
-| 보드 | ESP32-C3 Super Mini (부저) |
-| Jetson 쪽 | USB Bluetooth 동글 (CSR 4.0, BLE 지원) |
-| 기기 이름 | `RETRACE-TAG-01` |
-| 서비스 UUID | `4951013c-1654-43f1-919f-a3ff928dc0b6` |
-| 특성(Characteristic) UUID | `36b342d0-153b-418e-b5d7-f95af507ec1f` (Write) |
-
-| 쓰는 값 | 바이트 | 동작 |
-|---|---|---|
-| `1` | ASCII 문자 `0x31` | 부저 울림 |
-| `0` | ASCII 문자 `0x30` | 부저 끔 |
-
-- 값은 **숫자 1·0(0x01·0x00)이 아니라 ASCII 문자**입니다. BLE 테스트 앱에서 텍스트(UTF-8)로 `1`을 쓰면 됩니다.
-
-- 값은 **정확히 1바이트**만 받습니다. 빈 값, `1\n`, `10`, 숫자 바이트 `0x01`/`0x00` 등은 무시하고 기존 동작을 유지합니다. 시리얼과 달리 줄 끝을 붙이지 않습니다.
-- `1`을 받으면 **시간 제한 없이 계속 울립니다**. 다시 `1`을 받아도 ON을 유지하며, `0`을 받으면 즉시 끕니다. 시간에 따른 자동 정지는 없습니다.
-- 사용자는 웹에서 **찾기 / 소리 끄기**를 누르고, Jetson이 각각 BLE `1` / `0`을 보내도록 연동합니다. 웹·Jetson 쪽 구현과 연동 검증은 해당 담당자의 작업입니다.
-- 전원을 켰을 때와 BLE 연결이 끊겼을 때는 부저 OFF입니다. 연결 해제 후 약 0.5초 뒤 광고를 다시 시작하며, 재연결만으로 부저가 켜지지는 않습니다.
-- 태그가 여러 개가 되면 기기 이름을 `RETRACE-TAG-02`, `03`...으로 늘립니다.
-
-테스트: 폰 BLE 테스트 앱(nRF Connect 등)으로 위 특성에 `1` 쓰기
-
----
-
-## 6. Jetson → 스마트폰 (ntfy)
+## 5. Jetson → 스마트폰 (ntfy)
 
 | 항목 | 값 |
 |---|---|
@@ -248,7 +220,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 
 ---
 
-## 7. Web/PWA ↔ Jetson (HTTP API) — 초안
+## 6. Web/PWA ↔ Jetson (HTTP API) — 초안
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
@@ -256,16 +228,13 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 | GET | `/api/items/{item}` | 특정 물건 Last Seen |
 | POST | `/api/items/{item}/aim` | 저장된 카메라 좌표로 레이저 안내 요청. 서랍 보관·좌표 없음은 HTTP 409, 레이저 연결·보정 없음은 HTTP 503 |
 | POST | `/api/drawers/{n}/open` | n번 서랍 열기 |
-| POST | `/api/buzzer` | 부저 태그 호출 |
 | GET | `/snapshots/{file}` | 스냅샷 이미지 |
 
-> 응답 형식(JSON 필드)은 Jetson 담당이 확정합니다. 부저 API는 찾기뿐 아니라 소리 끄기 요청도 BLE `0`으로 이어져야 하며, 요청 본문·경로는 Jetson·웹 담당자가 확정합니다. 위 표는 보드 펌웨어 작성 완료와 별개인 허브 측 초안입니다.
-
-### 7-1. 웹 뼈대에서 사용하는 JSON 임시안
+### 6-1. 웹 뼈대에서 사용하는 JSON 임시안
 
 `feature/web`의 화면과 샘플 데이터는 아래 형식을 사용합니다. **기존 메서드·경로는 유지하며, 아래 JSON은 Jetson 담당자 합의 전 임시안입니다.** 서버에 이미 다른 형식이 있다면 이 문서와 `web/api.js`를 함께 맞춥니다. Jetson 서버 구현 완료를 의미하지 않습니다.
 
-저장 데이터의 시각·사진 경로·좌표·서랍 번호 표현은 8장의 Storage API 기준에 맞춥니다. `Retrace_API_Guide_v2.pdf`는 Jetson 내부 C API를 정의하므로, HTTP 경로·JSON 구조·HTTP 오류 코드와 저장 모듈 반환 코드의 변환은 웹·Jetson 담당자가 별도로 확정합니다.
+저장 데이터의 시각·사진 경로·좌표·서랍 번호 표현은 7장의 Storage API 기준에 맞춥니다. `Retrace_API_Guide_v2.pdf`는 Jetson 내부 C API를 정의하므로, HTTP 경로·JSON 구조·HTTP 오류 코드와 저장 모듈 반환 코드의 변환은 웹·Jetson 담당자가 별도로 확정합니다.
 
 | 요청 | 요청 본문 | 성공 응답 (HTTP 200) |
 |---|---|---|
@@ -273,11 +242,10 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 | `GET /api/items/{item}` | 없음 | `LastSeen` 객체 |
 | `POST /api/items/{item}/aim` | `{}` | `{ "ok": true }` 또는 `NO_POSITION` / `LASER_UNAVAILABLE` 오류 |
 | `POST /api/drawers/{n}/open` | `{}` | `{ "ok": true }` |
-| `POST /api/buzzer` | `{ "enabled": true }` 또는 `{ "enabled": false }` | `{ "ok": true }` |
 
-POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=true`는 BLE ASCII `1`, `false`는 ASCII `0`으로 Jetson이 변환합니다. 웹은 UART·MQTT·BLE를 직접 제어하지 않습니다. 레이저 안내는 웹 버튼 요청 시 저장된 카메라 좌표를 사용하며 최대 5초 점등 후 소등·중앙 복귀합니다. 마지막 확인 사진과 시각도 유지합니다. PIR·현관등·폰 알림 경로에서 레이저를 자동으로 켜지 않습니다.
+POST는 `Content-Type: application/json`을 사용합니다. 웹은 UART·MQTT를 직접 제어하지 않습니다. 레이저 안내는 웹 버튼 요청 시 저장된 카메라 좌표를 사용하며 최대 5초 점등 후 소등·중앙 복귀합니다. 마지막 확인 사진과 시각도 유지합니다. PIR·현관등·폰 알림 경로에서 레이저를 자동으로 켜지 않습니다.
 
-`LastSeen` 예제 (8장 필드 이름 사용):
+`LastSeen` 예제 (7장 필드 이름 사용):
 
 ```json
 {
@@ -297,20 +265,18 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 - `snapshot`: `data_dir` 기준 `snapshots/rt_<소문자 16진수 32자리>.jpg` 상대 경로 또는 `null`. 웹은 동일 서버의 `GET /snapshots/{file}`로 표시합니다. 임의 외부 주소나 상위 폴더 경로는 받지 않습니다.
 - `drawer_id`: JSON에서는 1~6 정수 또는 `null`. C API의 `0`은 서랍 없음이며 DB에서는 SQL `NULL`로 저장되므로, 서버가 JSON `null`로 변환합니다. `state`: `visible` / `occluded` / `uncertain`.
 - `observed`와 `has_position`은 C 조회 구조체의 판별 필드입니다. HTTP 응답에 이 필드를 직접 포함할지와 JSON 타입은 웹·Jetson 담당자가 확정합니다.
-- `{ "ok": true }`는 **서버의 요청 접수 응답**이며, 실제 서보 이동·레이저 점등·부저 소리 완료를 뜻하지 않습니다. 보드 응답 대기·장치 오류 처리 방식은 Jetson 담당자가 추가로 확정합니다.
+- `{ "ok": true }`는 **서버의 요청 접수 응답**이며, 실제 서보 이동·레이저 점등 완료를 뜻하지 않습니다. 보드 응답 대기·장치 오류 처리 방식은 Jetson 담당자가 추가로 확정합니다.
 - 실패는 HTTP 4xx/5xx와 `{ "error": { "code": "ITEM_NOT_FOUND", "message": "물건 기록이 없습니다." } }` 형태의 임시안을 사용합니다. 웹은 실패·시간 초과를 표시하며, 실제 연결 실패 시 샘플 성공으로 바꾸지 않습니다.
-- 부저 켜기·끄기는 하나의 태그 기준입니다. 물건마다 별도 태그를 고르는 기능·장치 상태 조회 API는 아직 정의하지 않았습니다.
-
 웹 기본 설정은 샘플 모드이며 실제 API 요청을 보내지 않습니다. 실행·연동 전환·검증 방법은 [feature/web의 웹 인계 문서](https://github.com/dev-gabin/Retrace-Project/blob/feature/web/web/README.md)를 참고합니다. 웹 코드와 인계 문서는 `feature/web`에서 관리하며, 이 프로토콜 문서는 각 브랜치에서 공통으로 공유합니다.
 
 ---
 
-## 8. Jetson 저장 데이터·C Storage API (Last Seen)
+## 7. Jetson 저장 데이터·C Storage API (Last Seen)
 
 기준: 짝꿍이 작성한 `Retrace_API_Guide_v2.pdf` (Retrace Storage API 안내).
 `storage.h`에 공개된 Jetson 내부 C 저장 API를 사용하며, Python이 저장한 JPEG의 상대 경로를 검증하고 관측 정보와 함께 **MariaDB**에 기록합니다. 아래 필드는 C 조회 구조체 `RtRecord` 기준입니다. 실제 SQL 스키마와 HTTP 직렬화 구현은 Jetson 저장·서버 모듈에서 관리합니다.
 
-### 8-1. 최신 관측 정보 (`RtRecord`)
+### 7-1. 최신 관측 정보 (`RtRecord`)
 
 | C 필드 | 의미·규칙 | DB·HTTP 표현 |
 |---|---|---|
@@ -327,7 +293,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 - **등록됐지만 관측 전인 물건**: `rt_get()`은 `RT_OK`이며 `row->observed == 0`입니다. `rt_list()`에도 포함됩니다.
 - `observed`와 `has_position`은 조회 상태를 구분하는 C 필드입니다. 물리적 DB 열이나 최종 HTTP 응답 필드로 확정한 것은 아닙니다.
 
-### 8-2. 연결 설정과 핸들
+### 7-2. 연결 설정과 핸들
 
 | `RtConfig` 필드 | 의미 |
 |---|---|
@@ -341,7 +307,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 `RtStore`는 내부 연결을 감추는 핸들이며, **핸들 하나는 한 스레드에서 사용**합니다.
 `rt_open()` 성공 시 `*out`에 핸들을 돌려주고, 실패 시 `*out`은 `NULL`이며 호출자가 제공한 `error` 버퍼에 원인이 기록됩니다.
 
-### 8-3. 공개 C API
+### 7-3. 공개 C API
 
 | 함수 | 역할·호출자 처리 |
 |---|---|
@@ -356,7 +322,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 `rt_close()`와 `rt_error()` 외 함수의 반환형은 `int`입니다. 반환값은 다음 절의 저장 모듈 코드이며, UART 응답이나 HTTP 상태 코드와 구분합니다.
 
-### 8-4. 반환 코드
+### 7-4. 반환 코드
 
 | 코드 | 값 | 의미·처리 |
 |---|---|---|
@@ -369,7 +335,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 
 `RT_COMMIT_UNKNOWN`을 저장 실패 확정으로 처리해 입력 사진을 삭제하지 않습니다. `RT_CLEANUP_PENDING`은 DB 저장 성공과 후속 정리 상태를 구분해서 처리합니다.
 
-### 8-5. 사진 저장·복구 규칙
+### 7-5. 사진 저장·복구 규칙
 
 1. Python이 전체 프레임 JPEG를 `RETRACE_DATA_DIR/snapshots`에 **완전히 기록하고 파일을 닫습니다**. 이 경로는 C의 `data_dir` 아래 사진 디렉터리와 일치시킵니다.
 2. 매 저장마다 고유한 이름을 사용하고, 다음 형식의 **상대 경로**를 `rt_save()`에 전달합니다.
@@ -403,7 +369,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 - [ ] HC-06 실제 통신 속도 (기본 9600인지 모듈 확인)
 - [ ] 서랍 LED 10초 소등 / 현관등 기본 점등 10초·ALERT 10초·깜빡임 250ms를 실물에 맞춰 보정
 - [ ] ntfy 서버 포트
-- [ ] HTTP API JSON 임시안(7-1)을 Jetson·웹 담당자가 함께 확정, 장치 오류·완료 응답 방식 정의
+- [ ] HTTP API JSON 임시안(6-1)을 Jetson·웹 담당자가 함께 확정, 장치 오류·완료 응답 방식 정의
 - [ ] Storage API의 `observed`·`has_position`과 반환 코드를 HTTP JSON·상태 코드로 변환하는 규칙 확정
 - [ ] 추적 물건 목록 최종 확정 (안경 / 지갑)
 
@@ -415,7 +381,8 @@ POST는 `Content-Type: application/json`을 사용합니다. 부저 `enabled=tru
 |---|---|
 | v0.1 | 최초 초안 |
 | v0.2 | 대소문자 규칙(**대문자만**, 소문자는 `ERR:UNKNOWN`), 보드 이름·담당·폴더 표기 통일, 서랍 번호 그림, STM32 #2 USART1·디버그 USART2 구분, 핀맵 문서 연결 |
-| v0.3 | 이벤트 끼어들기 처리 규칙, 당시 `PING` 응답 형식 통일, 형식 설명(`:` / `,`) 수정, BLE 값 ASCII 명시, ntfy 제목 영문·본문 한글로 통일, MQTT 대소문자 범위(연결 상태는 관례대로 소문자) 명시 |
+| v0.3 | 이벤트 끼어들기 처리 규칙, 당시 `PING` 응답 형식 통일, 형식 설명(`:` / `,`) 수정, ntfy 제목 영문·본문 한글로 통일, MQTT 대소문자 범위(연결 상태는 관례대로 소문자) 명시 |
 | v0.4 | 서랍 번호 배치를 pinmap.md 3-2 기준(2열 × 3행)으로 통일 |
-| v0.5 | 현관등 PIR·ALERT·QoS 1 구현 기준 명시, 부저 자동 정지 제거 및 웹 끄기 요청 기준 반영 |
+| v0.5 | 현관등 PIR·ALERT·QoS 1 구현 기준 명시 |
 | v0.6 | `Retrace_API_Guide_v2.pdf` 기준으로 MariaDB·C Storage API, 관측 여부·좌표 여부, UTC 시각·사진 경로, 반환 코드·복구 규칙 반영. 관련 Last Seen JSON 예제 수정, HTTP 형식은 초안 유지 |
+| v0.7 | 사용하지 않는 ESP32-C3 태그 관련 연결·API 초안 제거, 이후 장 번호 정리 |

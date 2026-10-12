@@ -1,13 +1,9 @@
-.PHONY: all bluetooth ble clean
+.PHONY: all bluetooth clean
 
-all: bluetooth ble
+all: bluetooth
 
 bluetooth:
 	$(MAKE) -C bluetooth
 
-ble:
-	$(MAKE) -C ble
-
 clean:
 	$(MAKE) -C bluetooth clean
-	$(MAKE) -C ble clean
