@@ -1,6 +1,6 @@
 # Retrace 강의실 통합 테스트 체크리스트
 
-메인 유닛·서랍·현관등·부저의 테스트를 이 문서에서 함께 관리한다. 체크는 **실제로 실행하고 예상 결과와 비교한 뒤** 표시한다.
+메인 유닛·서랍·현관등의 테스트를 이 문서에서 함께 관리한다. 체크는 **실제로 실행하고 예상 결과와 비교한 뒤** 표시한다.
 
 보드 단독 테스트는 담당 feature 브랜치에서 업로드해 진행한다 (STM32 = `feature/stm32`, ESP32 = `feature/esp32`). Jetson·웹과의 통합 테스트는 develop에 합친 뒤 진행한다.
 
@@ -13,17 +13,15 @@
 | STM32 #1 메인 유닛 | `stm32/main_unit`, `feature/stm32` | USB 명령, Pan/Tilt 보정, 레이저, PIR |
 | STM32 #2 서랍 | `stm32/drawer`, `feature/stm32` | USB → HC-06, LED, 서보 밀기·복귀, SOS |
 | ESP32 #1 현관등 | `esp32/entrance_node`, `feature/esp32` | 한 색 LED, PIR, Wi-Fi/MQTT, 경고·복귀 |
-| ESP32 #2 부저 | `esp32/buzzer_tag`, `feature/esp32` | BLE, 계속 울림, 끄기, 재연결 |
 | Jetson / 웹 연동 | 해당 담당자의 코드 | 보드 단독 테스트 후 develop에서 진행 |
 
-권장 순서: **배선·부품 확인 → 메인 유닛 단독 → 서랍 USB → 서랍 HC-06 → 부저 BLE → 현관등 → Jetson·웹 연동**.
+권장 순서: **배선·부품 확인 → 메인 유닛 단독 → 서랍 USB → 서랍 HC-06 → 현관등 → Jetson·웹 연동**.
 
 | 연결 | 설정 |
 |---|---|
 | 메인 유닛 USB VCP (USART2) | 115200, 8N1, 대문자 ASCII, 명령 끝 LF (`\n`) |
 | 서랍 USB VCP (USART2, 테스트용) | 115200, 8N1, 같은 시리얼 명령 |
 | 서랍 HC-06 (USART1) | 9600, 8N1 가정. 실제 모듈 속도 확인 |
-| 부저 BLE | Text/UTF-8 한 글자 `1` / `0`, **줄 끝 없음** |
 | 현관등 MQTT | Jetson 브로커 포트 1883, 토픽·값은 5장 참고 |
 
 시리얼은 명령을 보낸 UART로 `OK`/`ERR` 응답을 받는다. 서랍 SOS 이벤트는 USB와 HC-06 양쪽으로 전달한다. 자세한 약속은 [통신 프로토콜](protocol.md)을 참고한다.
@@ -43,16 +41,6 @@ cmake --build stm32/main_unit/build/Debug
 - 정상 빌드 기준: 경고 0개, 메인 유닛 FLASH 약 19.8KB, 서랍 FLASH 약 21.3KB.
 - 빌드 성공은 실제 UART 속도, NVIC, PWM 파형, 전원, 서보 이동 검증을 대신하지 않는다.
 
-### 부저 (`feature/esp32`)
-
-```powershell
-& "$env:USERPROFILE/.platformio/penv/Scripts/platformio.exe" run --project-dir esp32/buzzer_tag --environment esp32c3
-```
-
-- 플랫폼 `espressif32@7.1.3`, Arduino ESP32 2.0.17 계열의 내장 BLE 라이브러리 사용.
-- 정상 빌드 기준: 경고 0개, Flash 약 75%(983,938바이트), RAM 약 12%. Flash가 20% 안팎으로 작게 나오면 뼈대 코드를 빌드한 것이므로 브랜치를 확인한다.
-- 빌드 성공은 BLE 무선 연결·GPIO·실제 소리 검증을 대신하지 않는다.
-
 ### 현관등 (`feature/esp32`)
 
 ```powershell
@@ -69,14 +57,14 @@ cmake --build stm32/main_unit/build/Debug
 
 | 확인 | 입력·조작 | 예상 결과 |
 |---|---|---|
-| □ | `PING` | `OK:PING` |
+| □ | `PING` | `OK@PING` |
 | □ | `AIM:90,45` | `OK:AIM`, Pan 90° / Tilt 45°에 해당하는 PWM |
 | □ | `AIM:0,0`, `AIM:180,180` | `OK:AIM`, 보정한 범위 내 이동 |
 | □ | `AIM:181,90` | `ERR:AIM:RANGE`, 이전 위치 유지 |
 | □ | `aim:90,45` | `ERR:UNKNOWN` |
 | □ | `LASER:ON`, `LASER:OFF` | 각각 `OK:LASER`, 출력 ON / OFF |
 | □ | `HOME` | `OK:HOME`, Pan/Tilt 90° + 레이저 OFF |
-| □ | PIR 입력 HIGH / LOW 유지 | 50ms 필터 후 `EVT:PIR:1` / `EVT:PIR:0` |
+| □ | PIR 입력 HIGH / LOW 유지 | 50ms 필터 후 `EVT@PIR:1` / `EVT@PIR:0` |
 | □ | B1 버튼 | PIR 이벤트 오발행 없음 |
 
 - [ ] 실제 SG90 범위에 맞춰 `pan_tilt.c`의 최소·최대 펄스 보정 (현재 임시 1000~2000µs).
@@ -108,7 +96,7 @@ cmake --build stm32/main_unit/build/Debug
 | USB | HC-06 | 입력·조작 | 예상 결과 |
 |---|---|---|---|
 | □ | □ | 전원 ON | LED OFF, 서보 Pulse 0 |
-| □ | □ | `PING` | `OK:PING` |
+| □ | □ | `PING` | `OK@PING` |
 | □ | □ | `LED:1:ON` | `OK:LED`, 1번만 점등 |
 | □ | □ | `LED:6:ON` | `OK:LED`, 1번 OFF / 6번 ON |
 | □ | □ | `LED:1:OFF` | `OK:LED`, 6번은 유지 |
@@ -185,44 +173,7 @@ mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m ALERT
 mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m NORMAL
 ```
 
-## 6. ESP32 #2 부저 태그
-
-| 항목 | 값 |
-|---|---|
-| 보드 | ESP32-C3 Super Mini |
-| 부저 제어 | GPIO3, HIGH = ON / LOW = OFF |
-| 부저 종류 | 액티브 부저 또는 HIGH 입력으로 켜지는 구동 회로 기준. 실제 종류·전류 확인 필요 |
-| 정지 방식 | 시간 제한 없이 유지. 웹의 끄기 요청을 Jetson이 BLE `0`으로 전달하면 OFF. 연결 해제 감지 시에도 OFF |
-| BLE 이름 | `RETRACE-TAG-01` |
-| 서비스 UUID | `4951013c-1654-43f1-919f-a3ff928dc0b6` |
-| Write 특성 UUID | `36b342d0-153b-418e-b5d7-f95af507ec1f` |
-
-핀은 `src/main.cpp` 맨 위의 `BUZZER_PIN`에서 조정한다. 패시브 부저는 HIGH 유지로 지속 음을 내지 못하므로 부품 종류를 먼저 확인한다. 배선·구동 회로는 [핀맵 6장](pinmap.md#6-esp32-2-부저-태그-esp32-c3-super-mini)을 따른다.
-
-PlatformIO 보드 설정은 기존 `esp32-c3-devkitm-1`(ESP32-C3 / 4MB Flash)을 유지한다. 실제 Super Mini의 칩·Flash 용량과 USB 업로드 동작은 실물에서 확인한다.
-
-폰 BLE 테스트 도구에서 이름을 검색하고 연결한 뒤 위 서비스의 **Write 특성**을 선택한다. **Text/UTF-8 한 글자**로 쓰고 줄 끝을 붙이지 않는다. Hex 모드에서는 ON = `31`, OFF = `30`이다. 사용자가 웹을 사용할 때는 이 숫자를 직접 입력하지 않는다.
-
-| 확인 | 입력·조작 | 기대 결과 |
-|---|---|---|
-| □ | 전원 켜기 | 부저 OFF, `RETRACE-TAG-01` 검색 가능 |
-| □ | 연결만 하기 | OFF 유지, 서비스·Write 특성 UUID 일치 |
-| □ | Text `1` | GPIO3 HIGH, 부저 ON |
-| □ | Text `0` | GPIO3 LOW, 부저 OFF |
-| □ | Text `1`, 연결을 유지하며 30초 이상 기다리기 | 10초가 지나도 GPIO3 HIGH, ON 유지. 확인 후 `0`으로 정지 |
-| □ | 울리는 동안 다시 `1` | 끊김 없이 ON 유지. `0`을 보내면 OFF |
-| □ | 켜진 동안 Text `2`, `10`, 줄 끝 포함 `1\n`, Hex `01`/`00` 쓰기 | 기존 ON 상태 유지 |
-| □ | 꺼진 동안 같은 잘못된 값 쓰기 | OFF 유지 |
-| □ | 울리는 동안 BLE 연결 해제 | 보드가 해제 이벤트를 감지하면 OFF, 약 0.5초 뒤 다시 검색 가능 |
-| □ | 재연결 | OFF 유지, 다시 `1`/`0` 명령 가능 |
-| □ | USB 시리얼 모니터 없이 전원만 연결 | 광고·부저 ON/OFF 명령 정상 동작 |
-| □ | 울리는 중 전원 재시작 | 부팅 후 OFF, 다시 검색 가능 |
-
-앱에서 Disconnect를 누르면 보통 빠르게 해제 이벤트가 발생한다. 폰 전원을 끄거나 멀리 벗어나면 무선 연결 해제 감지까지 시간이 걸릴 수 있다. 시간에 따른 자동 정지는 없으므로 보드가 해제 이벤트를 감지할 때까지 ON을 유지한다.
-
-USB 로그는 115200이다. `BUZZER ON`, `BUZZER OFF`, `BLE disconnected; buzzer OFF`, `BLE advertising restarted`를 참고한다.
-
-## 7. Jetson·웹 통합 테스트 — 각 기능 연동 후
+## 6. Jetson·웹 통합 테스트 — 각 기능 연동 후
 
 보드 단독 검증이 끝난 뒤 해당 담당자와 함께 실행한다. 아래는 연동 확인 항목이며 **Jetson·웹 기능 구현 완료를 의미하지 않는다**.
 
@@ -233,9 +184,6 @@ USB 로그는 115200이다. `BUZZER ON`, `BUZZER OFF`, `BLE disconnected; buzzer
 | □ | 웹에서 물건 위치 안내 | Jetson이 목표 각도를 계산하고 STM32에 `AIM` 전달, 이동 후 레이저 제어 |
 | □ | 웹에서 1~6번 서랍 선택 | HC-06을 통해 해당 서랍 LED ON + 서보 밀기·복귀, LED 10초 후 OFF |
 | □ | 서랍 SOS 버튼 누르기 | `EVT@clientID:SOS`가 Jetson 서버 로그에 기록됨 (폰 알림·사이렌은 후속 구현) |
-| □ | 웹에서 부저 **찾기** | Jetson이 BLE `1` 전송, 부저 ON |
-| □ | 부저 연결을 유지하며 30초 이상 기다리기 | 자동으로 꺼지지 않고 계속 울림 |
-| □ | 웹에서 부저 **소리 끄기** | Jetson이 BLE `0` 전송, 부저 OFF |
 | □ | 응답 대기 중 PIR·SOS 이벤트 수신 | Jetson이 이벤트와 `OK`/`ERR` 응답을 구분해 처리 |
 | □ | 현관 PIR 감지·ALERT | MQTT 이벤트와 경고 조명이 연결된 시나리오대로 동작 |
 | □ | 외출 알림 조건 충족 → Jetson에서 ntfy 전송 | 폰의 ntfy 앱에 제목 `Car Key Check`, 본문 `차키 챙기셨나요?` 알림이 도착하고 Tasker가 본문을 음성으로 읽음 |
@@ -243,7 +191,7 @@ USB 로그는 115200이다. `BUZZER ON`, `BUZZER OFF`, `BLE disconnected; buzzer
 | □ | 카톡·문자 등 다른 앱 알림 / ntfy의 다른 제목 알림 수신 | 외출 안내 TTS 규칙이 실행되지 않음. SOS 알림·사이렌은 별도 기존 항목으로 확인 |
 | □ | 같은 외출 알림의 중복 수신·알림 갱신 | 같은 알림을 반복해서 읽지 않음. 중복 판별 기준과 억제 시간은 Jetson·폰 담당자와 정해 기록하고, 새로운 외출 알림은 정상적으로 읽는지 확인 |
 
-## 8. 강의실 결과 기록
+## 7. 강의실 결과 기록
 
 실측한 펄스·시간과 실패한 입력을 기록하고, 수정 후 해당 항목을 다시 확인한다.
 
@@ -252,5 +200,4 @@ USB 로그는 115200이다. `BUZZER ON`, `BUZZER OFF`, `BLE disconnected; buzzer
 | 메인 유닛 | | | | |
 | 서랍 USB·HC-06 | | | | |
 | 현관등 | | | | |
-| 부저 BLE | | | | |
 | Jetson·웹 연동 | | | | |

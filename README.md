@@ -9,18 +9,17 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 **마지막 목격 정보(Last Seen)** 를 기억하고 복원하는 것을 핵심 목표로 합니다.
 
 **허브(Jetson Nano) + 노드** 구조로, 카메라 기반 비주얼 메모리를 중심으로  
-**레이저 안내**, **스마트 서랍**, **스마트 현관등**, **BLE 부저**, **Web/PWA**를 연동합니다.
+**레이저 안내**, **스마트 서랍**, **스마트 현관등**, **Web/PWA**를 연동합니다.
 
 ---
 
-## 시스템 구성
+시스템 구성
 
 | 노드 | 장치 | 역할 |
 |---|---|---|
 | **메인 유닛 (허브)** | Jetson Nano + 카메라 + STM32 | AI 객체 탐지, Last Seen, DB/이미지 저장, Web 서버, MQTT 브로커, 레이저 안내, PIR |
 | **서랍 노드** | STM32 NUCLEO-F411RE + HC-06 | 서랍 LED ×6, 서랍 팝업 서보 ×6, 비상 버튼 |
 | **출입 노드 (스마트 현관등)** | LOLIN D32 (ESP32) + PIR + LED | 외출 감지, 현관등 점등·경고 |
-| **부저 태그** | ESP32-C3 + 부저 | 중요 물건 부저 호출 |
 | **사용자 화면** | Web / PWA | 검색 및 시스템 제어 UI |
 
 ---
@@ -31,10 +30,10 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 - C / C++
 - YOLO / OpenCV
 - STM32 NUCLEO-F411RE ×2 (STM32CubeMX / CMake)
-- ESP32 (LOLIN D32, ESP32-C3) / PlatformIO
+- ESP32 (LOLIN D32) / PlatformIO
 - Wi-Fi / MQTT (Mosquitto)
 - ntfy (폰 푸시 알림)
-- Bluetooth (HC-06) / BLE
+- Bluetooth (HC-06)
 - GitHub / Jira
 
 ---
@@ -54,20 +53,18 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 │  [ STM32 Main Unit ]                        │
 │     Pan/Tilt / Laser / PIR                  │
 │                                             │
-└────┬───────────┬───────────┬───────────┬────┘
-     │           │           │           │
- Bluetooth     Wi-Fi        BLE        Wi-Fi
-  (HC-06)     (MQTT)                  (HTTP)
-     │           │           │           │
-┌────┴────┐ ┌────┴────┐ ┌────┴────┐ ┌────┴────┐
-│  Drawer │ │ Entrance│ │  Buzzer │ │ Web/PWA │
-│   Node  │ │   Node  │ │   Tag   │ │         │
-│ STM32 #2│ │LOLIN D32│ │ ESP32-C3│ │ Phone/PC│
-│         │ │         │ │         │ │         │
-│  LED x6 │ │   PIR   │ │  Buzzer │ │         │
-│ Servo x6│ │   LED   │ │         │ │         │
-│ SOS Btn │ │         │ │         │ │         │
-└─────────┘ └─────────┘ └─────────┘ └─────────┘
+└───────────┬──────────────┬──────────────┘
+            │              │
+       Bluetooth         Wi-Fi
+        (HC-06)      (MQTT / HTTP)
+            │              │
+      ┌─────┴─────┐  ┌─────┴─────┐  ┌───────────┐
+      │  Drawer   │  │ Entrance  │  │  Web/PWA  │
+      │   Node    │  │   Node    │  │ Phone / PC│
+      │ STM32 #2  │  │ LOLIN D32 │  │           │
+      │ LED x6    │  │ PIR / LED │  │           │
+      │ Servo x6  │  │           │  │           │
+      └───────────┘  └───────────┘  └───────────┘
 ```
 
 | 노드 | 설명 |
@@ -75,7 +72,6 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 | Main Unit (Hub) | Jetson Nano + 카메라 + STM32 #1 메인 유닛 제어 보드를 한 몸체로 구성 |
 | Drawer Node | 스마트 서랍 + 비상 폰 찾기(사이렌) 버튼 (STM32 #2 + HC-06) |
 | Entrance Node | 스마트 현관등 (LOLIN D32 + PIR + LED) |
-| Buzzer Tag | BLE 부저 태그 (ESP32-C3) |
 | Web/PWA | 사용자 화면 (스마트폰 / PC), 폰 사이렌은 ntfy 앱으로 수신 |
 
 Jetson Nano가 허브로서 판단·기록·서비스를 담당하고,  
@@ -93,13 +89,12 @@ Jetson Nano가 허브로서 판단·기록·서비스를 담당하고,
 | Jetson ↔ STM32 | USB Serial (ST-LINK VCP) | 메인 유닛 내부, 카메라·레이저 위치 고정 |
 | Jetson ↔ 서랍 노드 | **Bluetooth** (HC-06) | 같은 방 안 가구 — 근거리, 공유기 불필요 |
 | Jetson ↔ 출입 노드 | **Wi-Fi** (MQTT) | 다른 공간(현관) — 공유기 경유 |
-| Jetson ↔ 부저 태그 | **BLE** | 물건에 부착되는 저전력 장치 |
 | Jetson ↔ Web / PWA | **Wi-Fi** (HTTP) | 사용자 화면 |
 | Jetson → 스마트폰 알림 | **Wi-Fi** (ntfy) | 화면이 꺼진 폰도 받아야 하는 알림 (폰 사이렌, 외출 알림) |
 
-> **같은 방 = Bluetooth / 다른 공간 = Wi-Fi / 물건에 붙는 장치 = BLE**
+> **같은 방 = Bluetooth / 다른 공간 = Wi-Fi**
 
-Jetson의 Bluetooth·BLE는 USB Bluetooth 4.0 동글(CSR8510)을 사용합니다.
+Jetson의 Bluetooth는 USB Bluetooth 4.0 동글(CSR8510)을 사용합니다.
 
 ### MQTT 토픽
 
@@ -200,20 +195,6 @@ Jetson Nano
           폰 TTS → "차키 챙기셨나요?" 음성 안내
 ```
 
-### BLE 부저
-
-```text
-Web / PWA
-   ↓ HTTP
-Jetson Nano
-   ↓ BLE
-부저 태그 (ESP32-C3)
-   ↓
-부저 울림
-```
-
----
-
 ## 프로젝트 구조
 
 ```text
@@ -227,7 +208,7 @@ Retrace-Project/
 │  │     ├─ cmd_parser.c               # 명령 해석 (PING · AIM · LASER · HOME)
 │  │     ├─ pan_tilt.c                 # Pan/Tilt 서보 PWM
 │  │     ├─ laser.c                    # 레이저 ON/OFF
-│  │     └─ pir_sensor.c               # PIR 감지 → EVT:PIR
+│  │     └─ pir_sensor.c               # PIR 감지 → EVT@PIR
 │  └─ drawer/                          # STM32 #2 서랍 (Jetson ↔ HC-06)
 │     ├─ drawer.ioc                    # CubeMX 핀·주변장치 설정
 │     └─ Core/Src/
@@ -244,10 +225,6 @@ Retrace-Project/
 │  │  └─ include/
 │  │     ├─ entrance_control.h         # PIR 필터 · 센서등 · 경고 타이머
 │  │     └─ network_config.example.h   # Wi-Fi · Jetson 주소 설정 예제
-│  └─ buzzer_tag/                      # ESP32 #2 부저 태그 (Jetson ↔ BLE)
-│     ├─ platformio.ini                # 보드 · 빌드 설정
-│     ├─ src/main.cpp                  # BLE 수신 · 부저
-│     └─ include/buzzer_control.h      # ON/OFF 명령 처리
 │
 ├─ jetson_nano/                        # 허브 (Python 애플리케이션 + C 서버)
 │  ├─ main.py                          # PIR 기반 카메라 추론 진입점
@@ -257,7 +234,7 @@ Retrace-Project/
 │  └─ server_jetson/                   # TCP 서버 · DB · 스냅샷 저장
 │
 ├─ web/                                # 사용자 화면 (Web / PWA)
-│  ├─ index.html                       # 물건 찾기 · 서랍 · 부저 화면
+│  ├─ index.html                       # 물건 찾기 · 서랍 화면
 │  ├─ styles.css                       # PC · 휴대폰 레이아웃
 │  ├─ app.js                           # 검색 · 선택 · 요청 · 오류 표시
 │  ├─ api.js                           # HTTP API 요청 · 응답 검사
