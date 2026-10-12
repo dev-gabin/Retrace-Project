@@ -62,8 +62,6 @@ pio device monitor -d esp32/preparation_display
 
 업로드는 실제 연결한 C3 포트를 선택해서 진행합니다. 펌웨어 빌드 성공은 LCD 배선, 인터넷, Jetson 실제 접근 확인을 대신하지 않습니다.
 
-`tests/last_seen_test.cpp`는 PC C++ 테스트입니다. UTC→한국 시간의 날짜 변경, 잘못된 시각 거부, 최신 3개 정렬, 오전 표시 범위와 타이머 값 넘침을 확인합니다. 실제 C3의 HTTP 통신·LCD 출력은 아래 실물 순서로 확인합니다.
-
 ## 검증 순서
 
 1. 시리얼 115200에서 LCD 발견 여부와 Wi-Fi 연결 후 `Items updated`를 확인합니다.

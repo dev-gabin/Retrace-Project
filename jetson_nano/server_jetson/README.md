@@ -178,16 +178,6 @@ TCP 로그인은 기존 `[ID:비밀번호]` 한 번으로 시작합니다. PING 
 커밋 불확실 상태에서 새 사진을 지우면 DB가 이미 그 사진을 가리킬 수 있어 보존합니다.
 디스크 완전 고장/전원 장애까지 검증한 것은 아닙니다. `fsync` 및 원자적 파일 공개로 순서를 지키며, 실제 SD 카드의 내구성과 정전 테스트는 별도입니다.
 
-## C 통합 테스트
-
-```sh
-cmake -S jetson_nano/server_jetson -B jetson_nano/server_jetson/build -DRETRACE_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-cmake --build jetson_nano/server_jetson/build -j2
-echo "자동 통합 테스트 스크립트는 현재 포함되어 있지 않습니다."
-```
-
-`RETRACE_BUILD_TESTS=ON`은 현재 테스트용 CLI만 추가 빌드합니다. 배포 빌드는 `RETRACE_BUILD_TESTS=OFF`로 구성하세요.
-
 ## Jetson Nano 배포 (Ubuntu 20.04 / ARM64)
 
 WSL 실행 파일은 x86_64이므로 Jetson에 복사해서 실행할 수 없습니다. **소스를 복사하고 Jetson에서 다시 빌드**합니다.
@@ -196,7 +186,7 @@ WSL 실행 파일은 x86_64이므로 Jetson에 복사해서 실행할 수 없습
 2. 프로젝트 소스를 `/home/jetson/Retrace-Project` 등에 복사합니다. `build/`, 테스트 출력, WSL의 실제 비밀번호는 배포본에서 제외합니다.
 3. `sudo systemctl enable --now mariadb` 후 이 문서의 `init.sql`을 관리자 권한으로 실행합니다. SQL이 `retrace` 앱 계정을 만들며, 초기 비밀번호는 운영 전에 변경해야 합니다.
 4. `jetson_nano/.local/db.env`를 `jetson_nano/server_jetson/.env.example` 기준으로 만들고 권한 600을 적용합니다. `RETRACE_DATA_DIR=/home/jetson/retrace-data`처럼 영구 저장 경로를 지정합니다.
-5. 새 빌드 폴더에서 `cmake -S jetson_nano/server_jetson -B jetson_nano/server_jetson/build -DRETRACE_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release` 및 `cmake --build jetson_nano/server_jetson/build -j2`를 실행합니다.
+5. 새 빌드 폴더에서 `cmake -S jetson_nano/server_jetson -B jetson_nano/server_jetson/build -DCMAKE_BUILD_TYPE=Release` 및 `cmake --build jetson_nano/server_jetson/build -j2`를 실행합니다.
 6. `jetson_nano/server_jetson/build/retrace-db list`, 실제 사진으로 save/get/image, recover를 확인합니다. 카메라·인식 모델은 이 단계에 필요하지 않습니다.
 
 순수 C11과 Linux/POSIX API, MariaDB Connector/C, libjpeg를 사용합니다. ARM 전용 최적화나 CUDA에 의존하지 않습니다.

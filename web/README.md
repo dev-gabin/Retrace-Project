@@ -31,8 +31,7 @@ node web/dev-server.mjs
 | `demo-data.js` | 임시 API 형식의 샘플 기록, 장치 요청 흉내 |
 | `assets/demo-scene.svg` | 실제 사진이 아닌 샘플 장면 |
 | `dev-server.mjs` | 127.0.0.1에만 연결되는 로컬 정적 파일 확인 서버 |
-| `package.json` | JavaScript 모듈 설정·선택적인 start/test 명령, 외부 의존성 없음 |
-| `tests/api.test.mjs` | 경로·요청 본문·응답 검사·실패 처리 검증 |
+| `package.json` | JavaScript 모듈 설정·선택적인 start 명령, 외부 의존성 없음 |
 
 ## Jetson API 연결
 
@@ -59,10 +58,6 @@ node web/dev-server.mjs
 
 ## 검증
 
-```powershell
-node --test web/tests/api.test.mjs
-```
-
 브라우저에서는 다음을 확인합니다.
 
 - 차키·에어팟·지갑 선택, 이름 검색·검색 결과 없음, 상세·마지막 목격 정보.
@@ -75,7 +70,6 @@ node --test web/tests/api.test.mjs
 
 ### 확인한 결과 (2026-10-03)
 
-- Node.js v24.19.0에서 API 테스트 **31/31 통과**, JavaScript 문법 검사 통과.
 - 브라우저 샘플 모드: 검색·검색 결과 없음, 세 물건 상세, 레이저 안내 요청, 서랍 선택·열기, 새로고침 확인.
 - PC 화면과 휴대폰 너비 360·390px에서 레이아웃 확인. 휴대폰 가로 넘침 없음. 서랍은 위 `1 2` / 가운데 `3 4` / 아래 `5 6` 배치.
 - 키보드 Tab·Enter로 물건 선택, 선택 후 포커스 유지, 사진 없는 기록의 안내 비활성화 확인.
