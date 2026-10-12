@@ -80,14 +80,10 @@ test('실제 모드는 문서의 모든 경로·메서드·본문을 사용한�
   assert.deepEqual(await api.listItems(), [record()]);
   assert.deepEqual(await api.getItem('carkey'), record());
   await api.openDrawer(6);
-  await api.setBuzzer(true);
-  await api.setBuzzer(false);
   assert.deepEqual(calls.map(({ url, method, body }) => [url, method, body]), [
     ['http://jetson.local:8080/api/items', 'GET', undefined],
     ['http://jetson.local:8080/api/items/carkey', 'GET', undefined],
     ['http://jetson.local:8080/api/drawers/6/open', 'POST', '{}'],
-    ['http://jetson.local:8080/api/buzzer', 'POST', '{"enabled":true}'],
-    ['http://jetson.local:8080/api/buzzer', 'POST', '{"enabled":false}'],
   ]);
   for (const call of calls) {
     assert.equal(call.headers.Accept, 'application/json');
@@ -117,19 +113,16 @@ test('샘플 모드는 모든 조회·제어에서 네트워크를 사용하지 
   assert.equal((await api.getItem('carkey')).pos_x, 412);
   for (const item of items) assert.deepEqual(await api.aim(item.item), { ok: true });
   for (let n = 1; n <= 6; n++) await api.openDrawer(n);
-  await api.setBuzzer(true);
-  await api.setBuzzer(false);
   assert.equal(fetched, 0);
 });
 
-test('잘못된 물건·서랍·부저 값은 요청 전에 거절한다', async () => {
+test('잘못된 물건·서랍 값은 요청 전에 거절한다', async () => {
   const { api, calls } = liveWith({ ok: true });
   for (const value of ['../carkey', 'CARKEY', '', null]) {
     await assert.rejects(api.getItem(value), hasCode('INVALID_ITEM'));
     await assert.rejects(api.aim(value), hasCode('INVALID_ITEM'));
   }
   for (const value of [0, 7, -1, 1.5, '1', null]) await assert.rejects(api.openDrawer(value), hasCode('INVALID_DRAWER'));
-  for (const value of [0, 1, '0', '1', null]) await assert.rejects(api.setBuzzer(value), hasCode('INVALID_BUZZER'));
   assert.equal(calls.length, 0);
 });
 
@@ -183,7 +176,6 @@ test('ok: true 접수 응답만 성공으로 처리한다', async () => {
   for (const data of [{ ok: false }, { ok: 'true' }, {}, null]) {
     const { api } = liveWith(data);
     await assert.rejects(api.openDrawer(1), hasCode('BAD_RESPONSE'));
-    await assert.rejects(api.setBuzzer(false), hasCode('BAD_RESPONSE'));
   }
 });
 
@@ -198,7 +190,6 @@ test('HTTP 실패·JSON 오류·네트워크 실패를 샘플 성공으로 바�
   await assert.rejects(nonJson.listItems(), hasCode('BAD_RESPONSE'));
   const offline = createApi({ mode: 'live', fetchImpl: async () => { throw new TypeError('Failed to fetch'); } });
   await assert.rejects(offline.listItems(), hasCode('NETWORK'));
-  await assert.rejects(offline.setBuzzer(true), hasCode('NETWORK'));
 });
 
 for (const phase of ['fetch', 'body']) test(`${phase} 대기 중 제한 시간이 지나면 취소하고 TIMEOUT을 알린다`, async () => {
@@ -209,7 +200,7 @@ for (const phase of ['fetch', 'body']) test(`${phase} 대기 중 제한 시간�
     }, { once: true }));
     return phase === 'fetch' ? pending() : { ok: true, status: 200, json: pending };
   } });
-  await assert.rejects(api.setBuzzer(false), hasCode('TIMEOUT'));
+  await assert.rejects(api.openDrawer(1), hasCode('TIMEOUT'));
   assert.equal(aborted, true);
 });
 

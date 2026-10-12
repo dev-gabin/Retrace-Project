@@ -8,7 +8,6 @@ export const demoItems = [
 
 export function createDemoTransport() {
   const items = structuredClone(demoItems);
-  let buzzerEnabled = false;
   let leaveItems = ['carkey'];
   return {
     async listItems() { return { items: structuredClone(items) }; },
@@ -32,10 +31,8 @@ export function createDemoTransport() {
       }
       return { ok: true };
     },
-    async setBuzzer(enabled) { buzzerEnabled = enabled; return { ok: true }; },
     async aim() { return { ok: true }; },
     async getLeaveItems() { return { items: [...leaveItems] }; },
     async setLeaveItems(items) { leaveItems = [...new Set(items)]; return { ok: true, items: [...leaveItems] }; },
-    get buzzerEnabled() { return buzzerEnabled; },
   };
 }

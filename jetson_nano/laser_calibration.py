@@ -175,7 +175,7 @@ from communication.stm32_link import Stm32Link, Stm32LinkError
 from vision.aim_mapper import AFFINE_NAMES, AimMapper, fit_affine
 
 
-PAGE = """<!doctype html>
+PAGE = r"""<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8">
@@ -184,7 +184,18 @@ PAGE = """<!doctype html>
   <style>
     body { margin: 0; background: #101828; color: #f8fafc; font: 16px system-ui, sans-serif; }
     main { max-width: 980px; margin: auto; padding: 24px; }
-    img { width: 100%; max-width: 900px; background: #020617; border-radius: 12px; }
+    .camera-view { position: relative; max-width: 900px; line-height: 0; }
+    .camera-view img { display: block; width: 100%; height: auto; background: #020617; border-radius: 12px; }
+    .camera-guide { position: absolute; inset: 0; pointer-events: none; overflow: hidden; border-radius: 12px; }
+    .camera-guide::before, .camera-guide::after { content: ''; position: absolute; background: #22d3ee; box-shadow: 0 0 2px #000; }
+    .camera-guide::before { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); }
+    .camera-guide::after { top: 50%; left: 0; right: 0; height: 2px; transform: translateY(-50%); }
+    .center-area { position: absolute; left: 45%; top: 45%; width: 10%; height: 10%; box-sizing: border-box; border: 2px dashed #facc15; background: #facc151a; }
+    .guide-caption { position: absolute; top: 8px; left: 8px; right: 8px; width: fit-content; padding: 6px 10px; background: #020617cc; color: #fff; font-size: 14px; line-height: 1.5; border-radius: 6px; }
+    .guide-toggle { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    #show-guide { width: auto; }
+    #show-guide:not(:checked) ~ .camera-view .camera-guide { display: none; }
+    .placement-help { color: #cbd5e1; line-height: 1.65; }
     .panel { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin-top: 18px; }
     label { display: grid; gap: 6px; font-weight: 700; }
     input { width: 100px; padding: 10px; font: inherit; }
@@ -199,8 +210,22 @@ PAGE = """<!doctype html>
 <body>
   <main>
     <h1>Retrace 레이저 보정</h1>
-    <p>웹에서 각도 이동과 레이저 ON/OFF를 따로 조작해 대략적인 중앙을 맞추세요.</p>
-    <img src="/stream.mjpg" alt="카메라 실시간 화면">
+    <h2>1. Jetson 웹캠에서 A4 배치 확인</h2>
+    <p class="placement-help">A4를 물건을 찾을 책상 면에 평평하게 놓으세요. 종이 가운데를 하늘색 십자선 근처에 두고 네 모서리가 모두 화면 안에 보이게 하세요. 가로 배치를 권장합니다.</p>
+    <section aria-label="Jetson 카메라 배치 안내">
+      <input id="show-guide" type="checkbox" checked>
+      <label class="guide-toggle" for="show-guide">중앙 안내선 표시</label>
+      <div class="camera-view">
+        <img id="camera-stream" src="/stream.mjpg" alt="이 보정 서버가 실행되는 Jetson에 연결된 웹캠 실시간 화면">
+        <div class="camera-guide" aria-hidden="true">
+          <div class="center-area"></div>
+          <span class="guide-caption">십자선 = 영상 중앙 · 노란 영역 = 종이 중심 배치 참고</span>
+        </div>
+      </div>
+    </section>
+    <p class="placement-help">종이의 서로 마주 보는 모서리를 연결한 두 대각선의 교차점이 종이 중심입니다. 그 지점이 십자선 근처면 됩니다. 노란 영역은 A4 테두리나 자동 판정 기준이 아닙니다.</p>
+    <p class="placement-help">정확히 중앙일 필요는 없습니다. 네 모서리가 보이는 것이 더 중요합니다. 이 안내는 배치 확인용이며 보정 완료를 뜻하지 않습니다. 카메라와 장치는 고정하고, 지금은 레이저를 켜거나 모터를 움직이지 마세요.</p>
+    <h2>2. 수동 레이저 조작 (배치 확인에는 사용하지 않음)</h2>
     <div class="panel">
       <label>Pan (0~180)<input id="pan" type="number" min="0" max="180" value="85"></label>
       <label>Tilt (0~180)<input id="tilt" type="number" min="0" max="180" value="42"></label>
@@ -211,8 +236,8 @@ PAGE = """<!doctype html>
     </div>
     <p id="status">준비됨</p>
     <p>기록할 값: 화면 <b>왼쪽 / 오른쪽 / 위 / 아래</b> 끝에 레이저가 닿는 각각의 pan 또는 tilt 값.</p>
-    <h2>A4 자동 5점 보정</h2>
-    <p>A4를 가로로 놓고 90,90 레이저 점이 A4 중앙 근처에 오도록 배치하세요.</p>
+    <h2>기존 A4 자동 5점 보정</h2>
+    <p>아래 버튼은 모터와 레이저를 움직이는 기존 보정입니다. 위의 종이 배치 확인 단계에서는 누르지 마세요. 새 기하학 좌표변환 보정은 아직 구현되지 않았습니다.</p>
     <div class="panel">
       <label>Pan 간격<input id="pan-step" type="number" min="2" max="30" value="8"></label>
       <label>Tilt 간격<input id="tilt-step" type="number" min="2" max="30" value="6"></label>

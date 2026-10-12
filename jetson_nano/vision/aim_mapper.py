@@ -6,6 +6,8 @@ from dataclasses import dataclass
 import math
 import os
 
+from vision.plane_calibration import Calibration, calibration_path, load_calibration
+
 
 AFFINE_NAMES = (
     "RETRACE_PAN_X", "RETRACE_PAN_Y", "RETRACE_PAN_OFFSET",
@@ -41,9 +43,16 @@ class AimMapper:
     tilt_top: float
     tilt_bottom: float
     affine: tuple[float, float, float, float, float, float] | None = None
+    plane: Calibration | None = None
 
     @classmethod
     def from_env(cls, frame_width: int, frame_height: int) -> "AimMapper":
+        path = calibration_path()
+        if "RETRACE_AIM_CALIBRATION" in os.environ or path.exists():
+            plane = load_calibration(path)
+            if (plane.width, plane.height) != (frame_width, frame_height):
+                raise ValueError("보정 파일과 카메라 해상도가 다릅니다.")
+            return cls(frame_width, frame_height, 0, 0, 0, 0, plane=plane)
         present = [name for name in AFFINE_NAMES if name in os.environ]
         if present:
             missing = [name for name in AFFINE_NAMES if name not in os.environ]
@@ -71,6 +80,8 @@ class AimMapper:
         )
 
     def map(self, x: int, y: int) -> tuple[int, int]:
+        if self.plane is not None:
+            return self.plane.map(x, y, self.frame_width, self.frame_height)
         if self.frame_width < 2 or self.frame_height < 2:
             raise ValueError("frame dimensions must be at least 2x2")
         if not 0 <= x < self.frame_width or not 0 <= y < self.frame_height:

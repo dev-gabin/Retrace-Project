@@ -1,5 +1,4 @@
 from pathlib import Path
-from collections import deque
 import time
 
 import cv2
@@ -21,12 +20,9 @@ REPOSITORY_DIR = JETSON_DIR.parent
 MODEL_PATH = JETSON_DIR / "models" / "yolo" / "coco83_yolo26n_v6_demo_desk.pt"
 
 CAMERA_INDEX = 0
-CONFIDENCE = 0.60
+CONFIDENCE = 0.50
 IMAGE_SIZE = 640
-PERSON_ENTER_CONFIDENCE = 0.55
-PERSON_KEEP_CONFIDENCE = 0.40
-PERSON_MISS_GRACE_SECONDS = 3.0
-PERSON_GRACE_SECONDS = 10.0
+PIR_GRACE_SECONDS = 10.0
 
 
 def main() -> None:
@@ -131,9 +127,7 @@ def main() -> None:
 
     state = "IDLE"
     pir_high = False
-    state_started = time.monotonic()
-    last_person_seen: float | None = None
-    person_window: deque[bool] = deque(maxlen=3)
+    pir_low_started: float | None = None
 
     print("[START] PIR-triggered Jetson YOLO mode (Ctrl+C: 종료)")
 
@@ -150,13 +144,17 @@ def main() -> None:
                     break
                 if event == "EVT@PIR:1":
                     pir_high = True
-                    if state in {"IDLE", "GRACE"}:
-                        state = "SEARCHING"
-                        state_started = time.monotonic()
-                        person_window.clear()
-                        print("[STATE] SEARCHING")
+                    pir_low_started = None
+                    if state != "ACTIVE":
+                        state = "ACTIVE"
+                        print("[STATE] ACTIVE (PIR)")
                 elif event == "EVT@PIR:0":
+                    if pir_high:
+                        pir_low_started = time.monotonic()
                     pir_high = False
+                    if state == "ACTIVE":
+                        state = "GRACE"
+                        print("[STATE] GRACE (PIR OFF)")
 
             while event_listener is not None and event_handler is not None:
                 device_event = event_listener.get_event(timeout=0)
@@ -175,43 +173,13 @@ def main() -> None:
 
             if state == "IDLE":
                 continue
-            person_confidence = max(
-                (
-                    detection["confidence"]
-                    for detection in detections
-                    if detection["name"] == "person"
-                ),
-                default=0.0,
-            )
-
-            if state == "SEARCHING":
-                person_window.append(person_confidence >= PERSON_ENTER_CONFIDENCE)
-                if len(person_window) >= 2 and sum(person_window) >= 2:
-                    state = "ACTIVE"
-                    last_person_seen = now
-                    print("[STATE] ACTIVE")
-                elif not pir_high and now - state_started >= PERSON_GRACE_SECONDS:
-                    state = "IDLE"
-                    tracker.reset_stability()
-                    print("[STATE] IDLE")
-                    continue
-            elif person_confidence >= PERSON_KEEP_CONFIDENCE:
-                if state != "ACTIVE":
-                    print("[STATE] ACTIVE")
-                state = "ACTIVE"
-                last_person_seen = now
-            else:
-                if last_person_seen is None:
-                    last_person_seen = now
-                if state != "ACTIVE" or now - last_person_seen >= PERSON_MISS_GRACE_SECONDS:
-                    if state != "GRACE":
-                        print("[STATE] GRACE")
-                    state = "GRACE"
-                if not pir_high and now - last_person_seen >= PERSON_GRACE_SECONDS:
-                    state = "IDLE"
-                    tracker.reset_stability()
-                    print("[STATE] IDLE")
-                    continue
+            if (not pir_high and pir_low_started is not None
+                    and now - pir_low_started >= PIR_GRACE_SECONDS):
+                state = "IDLE"
+                pir_low_started = None
+                tracker.reset_stability()
+                print("[STATE] IDLE")
+                continue
 
             for detection in tracker.update(detections):
                 center = detection["center"]

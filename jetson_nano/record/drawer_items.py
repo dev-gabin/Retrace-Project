@@ -1,4 +1,5 @@
 """Persist manual drawer assignments independently of camera observations."""
+from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone

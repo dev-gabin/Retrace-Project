@@ -276,8 +276,6 @@ function updateButtons() {
   const storageLabel = storageItem ? `${itemLabel(storageItem)}을 ${state.drawer}번 서랍에 보관 등록` : '보관할 물건을 선택해 주세요';
   $('drawer-store-button').setAttribute('aria-label', storageLabel);
   $('drawer-store-button').title = storageLabel;
-  $('buzzer-on-button').disabled = state.busy.has('buzzer');
-  $('buzzer-off-button').disabled = state.busy.has('buzzer');
 }
 
 function clearPhoto(title) {
@@ -527,19 +525,12 @@ $('related-drawer-button').addEventListener('click', () => {
   if (state.record?.drawer_id === null || !state.record) return;
   showItemDrawer(state.record);
 });
-for (const [id, enabled] of [['buzzer-on-button', true], ['buzzer-off-button', false]]) {
-  $(id).addEventListener('click', () => command('buzzer', 'sound', enabled ? '부저 찾기' : '부저 소리 끄기', () => api.setBuzzer(enabled), () => {
-    $('buzzer-status').textContent = isDemo ? enabled ? '샘플 · 찾기 요청됨, 실제 소리 없음' : '샘플 · 소리 끄기 요청됨' : enabled ? '찾기 요청 접수 · 실제 소리 상태 미확인' : '끄기 요청 접수 · 실제 소리 상태 미확인';
-    $('sound-bars').classList.toggle('is-active', isDemo && enabled);
-  }));
-}
 $('snapshot-image').addEventListener('error', () => { clearPhoto('사진을 불러오지 못했어요'); updateButtons(); });
 if (!isDemo) {
   $('mode-chip').lastChild.textContent = '서버 모드';
   $('mode-notice-title').textContent = '서버에 연결하는 화면이에요.';
   $('mode-notice-copy').textContent = '버튼을 누르면 실제 제어 요청을 보냅니다. 기기 동작 상태는 별도로 확인해 주세요.';
   $('footer-mode').textContent = '서버 모드 · 요청 접수와 실제 동작은 별도';
-  $('buzzer-status').textContent = '실제 소리 상태 미확인';
 }
 renderDrawerItems();
 renderLeaveRegistration();

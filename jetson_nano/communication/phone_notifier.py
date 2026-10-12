@@ -30,7 +30,7 @@ def leave_notification(names: list[str]) -> PhoneNotification:
     return PhoneNotification(
         title=LEAVE_TITLE,
         message=f"{', '.join(names)} 챙기셨나요?",
-        priority=4,
+        priority=5,
         tags="key",
     )
 
@@ -39,7 +39,7 @@ def sos_notification(sender: str) -> PhoneNotification:
     return PhoneNotification(
         title="Retrace SOS",
         message=f"{sender} 비상 버튼이 눌렸습니다.",
-        priority=5,
+        priority=4,
         tags="rotating_light",
     )
 

@@ -43,7 +43,6 @@ class RetraceHttpServer:
         host: str = "0.0.0.0",
         port: int = 8080,
         drawer_target: str = "DRAWER",
-        buzzer_target: str = "TOKEN",
         leave_items: LeaveItems | None = None,
         laser_seconds: float = 5.0,
     ) -> None:
@@ -58,7 +57,6 @@ class RetraceHttpServer:
         self.leave_items = leave_items
         self.web_root = Path(web_root).resolve()
         self.drawer_target = drawer_target
-        self.buzzer_target = buzzer_target
         handler = self._make_handler()
         self._server = ThreadingHTTPServer((host, port), handler)
         self._server.daemon_threads = True
@@ -86,7 +84,6 @@ class RetraceHttpServer:
             host=os.environ.get("RETRACE_HTTP_HOST", "0.0.0.0"),
             port=int(os.environ.get("RETRACE_HTTP_PORT", "8080")),
             drawer_target=os.environ.get("RETRACE_DRAWER_CLIENT_ID", "DRAWER"),
-            buzzer_target=os.environ.get("RETRACE_BUZZER_CLIENT_ID", "TOKEN"),
             leave_items=leave_items,
             laser_seconds=float(os.environ.get("RETRACE_LASER_SECONDS", "5.0")),
         )
@@ -253,21 +250,6 @@ class RetraceHttpServer:
             with self.drawer_items.lock:
                 self.storage.send_device_command(self.drawer_target, f"OPEN:{drawer}")
                 self.drawer_items.release(drawer)
-            self._send_json(request, HTTPStatus.OK, {"ok": True})
-            return
-
-        if path == "/api/buzzer":
-            body = self._read_json_object(request)
-            if set(body) != {"enabled"} or not isinstance(body["enabled"], bool):
-                raise HttpApiError(
-                    HTTPStatus.BAD_REQUEST,
-                    "INVALID_BUZZER",
-                    "enabled는 true 또는 false여야 합니다.",
-                )
-            state = "1" if body["enabled"] else "0"
-            self.storage.send_device_command(
-                self.buzzer_target, f"BUZZER:{state}"
-            )
             self._send_json(request, HTTPStatus.OK, {"ok": True})
             return
 

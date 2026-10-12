@@ -34,7 +34,7 @@ class LeaveVerifier:
         self,
         *,
         seconds: float = 3.0,
-        confidence: float = 0.60,
+        confidence: float = 0.50,
         required_hits: int = 3,
     ) -> None:
         if seconds <= 0:

@@ -120,16 +120,11 @@ class HttpApiTest(unittest.TestCase):
         self.assertEqual(record["pos_x"], 320)
         self.assertIsNone(record["drawer_id"])
 
-    def test_laser_keeps_drawer_and_buzzer_commands(self) -> None:
+    def test_laser_keeps_drawer_commands(self) -> None:
         self.assertEqual(self.request("/api/items/keyboard/aim", {}), (200, {"ok": True}))
         self.assertEqual(self.stm32.points, [(85, 42, 5.0)])
         self.assertEqual(self.request("/api/drawers/6/open", {}), (200, {"ok": True}))
-        self.assertEqual(self.request("/api/buzzer", {"enabled": True}), (200, {"ok": True}))
-        self.assertEqual(self.request("/api/buzzer", {"enabled": False}), (200, {"ok": True}))
-        self.assertEqual(
-            self.store.commands,
-            [("DRAWER", "OPEN:6"), ("TOKEN", "BUZZER:1"), ("TOKEN", "BUZZER:0")],
-        )
+        self.assertEqual(self.store.commands, [("DRAWER", "OPEN:6")])
 
     def test_leave_items_are_saved_and_validated(self) -> None:
         self.assertEqual(self.request("/api/leave-items"), (200, {"items": []}))
