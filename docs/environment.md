@@ -110,8 +110,7 @@ PlatformIO는 `ms-vscode.cpptools`에 의존한다. 현재 C/C++는 시험판이
 
 빌드 도구와 프레임워크는 같은 소스의 빌드 결과를 재현하기 위한 주요 관리 대상이다.
 
-현재 feature/jetson의 ESP32 설정은 `platform = espressif32`로 되어 있어 플랫폼 버전이 고정되어 있지 않다.
-팀 기준을 7.1.3으로 확정할 경우, 해당 ESP32 작업 브랜치에서 버전 지정과 재빌드 검증을 진행한다.
+ESP32 프로젝트는 `platform = espressif32@7.1.3`으로 버전을 고정한다.
 
 ## 3. Python 환경
 

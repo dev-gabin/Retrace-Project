@@ -2,18 +2,18 @@
 
 메인 유닛·서랍·현관등의 테스트를 이 문서에서 함께 관리한다. 체크는 **실제로 실행하고 예상 결과와 비교한 뒤** 표시한다.
 
-보드 단독 테스트는 담당 feature 브랜치에서 업로드해 진행한다 (STM32 = `feature/stm32`, ESP32 = `feature/esp32`). Jetson·웹과의 통합 테스트는 develop에 합친 뒤 진행한다.
+보드 단독 테스트와 통합 테스트는 최종 통합 브랜치인 `develop` 기준으로 진행한다.
 
 ## 1. 테스트 대상과 순서
 
-보드 단독 검증 → 문제가 있으면 담당 feature에서 수정·재검증 → feature → develop PR → develop에서 Jetson·웹과 전체 연동 검증 순서로 진행한다.
+보드 단독 검증 → 문제가 있으면 수정·재검증 → Jetson·웹 전체 연동 검증 순서로 진행한다.
 
-| 대상 | 펌웨어 위치·브랜치 | 강의실에서 확인할 것 |
+| 대상 | 펌웨어 위치 | 강의실에서 확인할 것 |
 |---|---|---|
-| STM32 #1 메인 유닛 | `stm32/main_unit`, `feature/stm32` | USB 명령, Pan/Tilt 보정, 레이저, PIR |
-| STM32 #2 서랍 | `stm32/drawer`, `feature/stm32` | USB → HC-06, LED, 서보 밀기·복귀, SOS |
-| ESP32 #1 현관등 | `esp32/entrance_node`, `feature/esp32` | 한 색 LED, PIR, Wi-Fi/MQTT, 경고·복귀 |
-| Jetson / 웹 연동 | 해당 담당자의 코드 | 보드 단독 테스트 후 develop에서 진행 |
+| STM32 #1 메인 유닛 | `stm32/main_unit` | USB 명령, Pan/Tilt 보정, 레이저, PIR |
+| STM32 #2 서랍 | `stm32/drawer` | USB → HC-06, LED, 서보 밀기·복귀, SOS |
+| ESP32 #1 현관등 | `esp32/entrance_node` | 한 색 LED, PIR, Wi-Fi/TCP, 경고·복귀 |
+| Jetson / 웹 연동 | `jetson_nano`, `web` | 보드 단독 테스트 후 전체 연동 |
 
 권장 순서: **배선·부품 확인 → 메인 유닛 단독 → 서랍 USB → 서랍 HC-06 → 현관등 → Jetson·웹 연동**.
 
@@ -22,15 +22,15 @@
 | 메인 유닛 USB VCP (USART2) | 115200, 8N1, 대문자 ASCII, 명령 끝 LF (`\n`) |
 | 서랍 USB VCP (USART2, 테스트용) | 115200, 8N1, 같은 시리얼 명령 |
 | 서랍 HC-06 (USART1) | 9600, 8N1 가정. 실제 모듈 속도 확인 |
-| 현관등 MQTT | Jetson 브로커 포트 1883, 토픽·값은 5장 참고 |
+| 현관등 TCP | Jetson `server_jetson` 포트 5000, ID/비밀번호는 5장 참고 |
 
 시리얼은 명령을 보낸 UART로 `OK`/`ERR` 응답을 받는다. 서랍 SOS 이벤트는 USB와 HC-06 양쪽으로 전달한다. 자세한 약속은 [통신 프로토콜](protocol.md)을 참고한다.
 
 ## 2. 빌드 확인 (보드 없이)
 
-아래 명령은 저장소 루트의 PowerShell에서 실행한다. STM32는 `feature/stm32`, ESP32는 `feature/esp32`로 전환한 뒤 빌드한다.
+아래 명령은 저장소 루트의 PowerShell에서 실행한다.
 
-### STM32 (`feature/stm32`)
+### STM32
 
 ```powershell
 cmake --build stm32/drawer/build/Debug
@@ -41,15 +41,15 @@ cmake --build stm32/main_unit/build/Debug
 - 정상 빌드 기준: 경고 0개, 메인 유닛 FLASH 약 19.8KB, 서랍 FLASH 약 21.3KB.
 - 빌드 성공은 실제 UART 속도, NVIC, PWM 파형, 전원, 서보 이동 검증을 대신하지 않는다.
 
-### 현관등 (`feature/esp32`)
+### 현관등
 
 ```powershell
 & "$env:USERPROFILE/.platformio/penv/Scripts/platformio.exe" run --project-dir esp32/entrance_node --environment lolin_d32 --environment lolin_d32_network_check
 ```
 
-- `lolin_d32`는 실제 보드용, `lolin_d32_network_check`는 `include/network_config.build_check.h`의 예시 설정으로 네트워크 코드까지 컴파일·링크하는 빌드 검증용이다. 보드 없이 실제 MQTT 서버에 접속하는 테스트가 아니다.
+- `lolin_d32`는 실제 보드용, `lolin_d32_network_check`는 `include/network_config.build_check.h`의 예시 설정으로 네트워크 코드까지 컴파일·링크하는 빌드 검증용이다. 보드 없이 실제 TCP 서버에 접속하는 테스트가 아니다.
 - 정상 빌드 기준: 경고 0개, 기본 빌드(`lolin_d32`) Flash 약 21%, 네트워크 빌드(`lolin_d32_network_check`) Flash 약 67%.
-- 빌드 성공은 PIR 전압·LED 구동·Wi-Fi 연결·실제 MQTT 발행/구독·Last Will 동작 검증을 대신하지 않는다.
+- 빌드 성공은 PIR 전압·LED 구동·Wi-Fi 연결·TCP 로그인과 이벤트 전달 검증을 대신하지 않는다.
 
 ## 3. STM32 #1 메인 유닛 (레이저·Pan/Tilt·PIR)
 
@@ -129,8 +129,8 @@ LED는 **서랍 닫힘을 감지하지 않고 시간으로 소등**한다. 사�
 | 보드 | LOLIN D32 |
 | PIR | GPIO34, INPUT, 50ms 필터. 센서 모델·출력 확인 필요. 내부 풀다운 없음 |
 | LED | 한 색 LED, GPIO25, OUTPUT, HIGH = ON / LOW = OFF. 실제 구동 회로 확인 |
-| MQTT | Jetson 브로커 포트 1883, 클라이언트 ID `retrace-entrance` |
-| 평소 점등 | PIR HIGH 동안 ON, 안정적인 LOW 감지 후 10초 유지 |
+| TCP | Jetson 서버 포트 5000, 기본 클라이언트 ID `ENTRANCE` |
+| 평소 점등 | PIR HIGH 동안 ON, 안정적인 LOW 감지 후 7초 유지 |
 | ALERT | 250ms마다 ON/OFF, 10초 후 기본 센서등 모드 복귀 |
 
 `src/main.cpp` 맨 위의 `LIGHT_HOLD_MS`, `ALERT_HOLD_MS`, `ALERT_BLINK_MS`, `PIR_DEBOUNCE_MS`는 임시값으로 강의실에서 조정한다.
@@ -138,39 +138,36 @@ LED는 **서랍 닫힘을 감지하지 않고 시간으로 소등**한다. 사�
 ### 5-1. 강의실 네트워크 설정
 
 1. `include/network_config.example.h`를 같은 폴더의 `network_config.h`로 복사한다.
-2. `WIFI_SSID`, `WIFI_PASSWORD`, `MQTT_HOST`에 강의실 Wi-Fi와 Jetson LAN IP를 입력한다. ESP32에서 `localhost`는 Jetson이 아니다. 필요하면 MQTT 사용자·비밀번호도 입력한다.
+2. `WIFI_SSID`, `WIFI_PASSWORD`, `SERVER_HOST`, `SERVER_PORT`, `CLIENT_ID`, `CLIENT_PASSWORD`를 입력한다. ESP32에서 `localhost`는 Jetson이 아니다. 같은 ID/비밀번호를 서버의 `idpasswd.txt`에도 등록한다.
 3. `lolin_d32` 환경으로 다시 빌드·업로드한다. `network_config.h`는 `.gitignore`로 제외되며 예제만 공유한다.
 
 설정이 비어 있으면 USB 로그에 `Network config empty; local light only`가 나오고 기본 PIR 센서등만 동작한다. 네트워크 연동 테스트를 하려면 설정을 채워야 한다.
 
-### 5-2. 센서등·MQTT 확인
+### 5-2. 센서등·TCP 확인
 
 | 확인 | 입력·조작 | 기대 결과 |
 |---|---|---|
 | □ | 전원 켜기, PIR LOW | LED OFF |
 | □ | 설정 없이 PIR HIGH 50ms 유지 | LED ON, 기본 센서등 동작 |
-| □ | Wi-Fi·MQTT 연결 | `retrace/entrance/status`에 `online` 게시 |
-| □ | 연결 중 PIR HIGH 50ms 유지 | LED ON, `retrace/entrance/motion`에 `1` 한 번 게시 |
+| □ | Wi-Fi·TCP 연결 | 로그에 `Server client connected` 표시 |
+| □ | 연결 중 PIR HIGH 50ms 유지 | LED ON, 서버에 `EVT@ENTRANCE:PIRON` 한 번 전달 |
 | □ | PIR HIGH 계속 유지 | LED 유지, motion 중복 발행 없음 |
 | □ | 안정적인 LOW 이후 다시 HIGH | 새 motion 한 번 게시 |
 | □ | PIR LOW 50ms 유지 후 10초 경과 | LED OFF |
-| □ | `retrace/entrance/light`에 `ALERT` | ON부터 시작, 250ms마다 ON/OFF |
+| □ | 서버에서 `ALERT` 전달 | ON부터 시작, 250ms마다 ON/OFF, `OK@LIGHT:ALERT` 응답 |
 | □ | 경고 시작 후 8초에 다시 `ALERT` | 다시 ON부터 시작, 마지막 명령부터 10초 뒤 기본 모드 |
 | □ | `NORMAL` 또는 ALERT 10초 경과 | 기본 센서등 모드 복귀. PIR 조건이 남아 있으면 ON |
-| □ | 소문자·공백·줄 끝·Retain 명령 | 무시, 기존 동작 유지 |
-| □ | MQTT 재연결 | light 재구독, `online` 다시 게시 |
-| □ | 전원 강제 해제·MQTT 연결 유실 | 브로커가 연결 유실을 감지하면 Last Will `offline` 게시 (즉시 감지를 보장하지 않음) |
-| □ | MQTT 없이 PIR 감지 | 기본 센서등 기능 유지 |
-| □ | MQTT 연결 실패 중 경고 타이머 확인 | 기존 ALERT는 10초 후 정상 복귀, PIR·LED 처리는 계속됨 |
+| □ | 서버에서 `PING@ENTRANCE` 요청 | 현관등이 `OK@PING` 응답 |
+| □ | TCP 연결 끊기 | 5초 간격으로 재접속, 로컬 PIR·LED는 계속 동작 |
+| □ | TCP 없이 PIR 감지 | 기본 센서등 기능 유지 |
+| □ | TCP 연결 실패 중 경고 타이머 확인 | 기존 ALERT는 10초 후 정상 복귀, PIR·LED 처리는 계속됨 |
 
-status는 QoS 1·Retain이며 Last Will도 동일하다. motion은 QoS 1·Retain 없음, light 구독은 QoS 1이며 명령은 Retain 없이 보낸다. 오프라인에서 새로 발생한 움직임은 보관하지 않고, 이미 발행 큐에 넣은 QoS 1 메시지는 재전송될 수 있다.
+연결되지 않은 동안 발생한 PIR 이벤트는 보관하지 않습니다. 연결 직후 `[ID:비밀번호]` 로그인이 성공해야 이벤트와 명령을 교환합니다.
 
-MQTT 테스트 명령은 **Jetson 터미널**에서 실행한다. `localhost`는 Jetson의 브로커를 뜻한다.
-
-```bash
-mosquitto_sub -h localhost -t "retrace/#" -v
-mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m ALERT
-mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m NORMAL
+```text
+[SERVER]PING@ENTRANCE
+[ENTRANCE]ALERT
+[ENTRANCE]NORMAL
 ```
 
 ## 6. Jetson·웹 통합 테스트 — 각 기능 연동 후
@@ -185,7 +182,7 @@ mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m NORMAL
 | □ | 웹에서 1~6번 서랍 선택 | HC-06을 통해 해당 서랍 LED ON + 서보 밀기·복귀, LED 10초 후 OFF |
 | □ | 서랍 SOS 버튼 누르기 | `EVT@clientID:SOS`가 Jetson 서버 로그에 기록됨 (폰 알림·사이렌은 후속 구현) |
 | □ | 응답 대기 중 PIR·SOS 이벤트 수신 | Jetson이 이벤트와 `OK`/`ERR` 응답을 구분해 처리 |
-| □ | 현관 PIR 감지·ALERT | MQTT 이벤트와 경고 조명이 연결된 시나리오대로 동작 |
+| □ | 현관 PIR 감지·ALERT | TCP 이벤트와 경고 조명이 연결된 시나리오대로 동작 |
 | □ | 외출 알림 조건 충족 → Jetson에서 ntfy 전송 | 폰의 ntfy 앱에 제목 `Car Key Check`, 본문 `차키 챙기셨나요?` 알림이 도착하고 Tasker가 본문을 음성으로 읽음 |
 | □ | Retrace 웹을 닫고 폰 화면을 잠근 뒤 새 외출 알림 전송 | 웹을 열거나 알림을 누르지 않아도 폰에서 안내 문장이 들림. 폰 모델·OS·필요한 권한·배터리 설정과 실제 결과를 기록 |
 | □ | 카톡·문자 등 다른 앱 알림 / ntfy의 다른 제목 알림 수신 | 외출 안내 TTS 규칙이 실행되지 않음. SOS 알림·사이렌은 별도 기존 항목으로 확인 |

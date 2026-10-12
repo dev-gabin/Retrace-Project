@@ -17,7 +17,7 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 
 | 노드 | 장치 | 역할 |
 |---|---|---|
-| **메인 유닛 (허브)** | Jetson Nano + 카메라 + STM32 | AI 객체 탐지, Last Seen, DB/이미지 저장, Web 서버, MQTT 브로커, 레이저 안내, PIR |
+| **메인 유닛 (허브)** | Jetson Nano + 카메라 + STM32 | AI 객체 탐지, Last Seen, DB/이미지 저장, Web/TCP 서버, 레이저 안내, PIR |
 | **서랍 노드** | STM32 NUCLEO-F411RE + HC-06 | 서랍 LED ×6, 서랍 팝업 서보 ×6, 비상 버튼 |
 | **출입 노드 (스마트 현관등)** | LOLIN D32 (ESP32) + PIR + LED | 외출 감지, 현관등 점등·경고 |
 | **사용자 화면** | Web / PWA | 검색 및 시스템 제어 UI |
@@ -31,7 +31,7 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 - YOLO / OpenCV
 - STM32 NUCLEO-F411RE ×2 (STM32CubeMX / CMake)
 - ESP32 (LOLIN D32) / PlatformIO
-- Wi-Fi / MQTT (Mosquitto)
+- Wi-Fi / TCP
 - ntfy (폰 푸시 알림)
 - Bluetooth (HC-06)
 - GitHub / Jira
@@ -47,7 +47,7 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 │        │ USB                                │
 │        v                                    │
 │  [ Jetson Nano ]   Vision / Last Seen / DB  │
-│        │           Web Server / MQTT Broker │
+│        │           Web API / TCP Server     │
 │        │ USB Serial                         │
 │        v                                    │
 │  [ STM32 Main Unit ]                        │
@@ -56,7 +56,7 @@ Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하
 └───────────┬──────────────┬──────────────┘
             │              │
        Bluetooth         Wi-Fi
-        (HC-06)      (MQTT / HTTP)
+        (HC-06)       (TCP / HTTP)
             │              │
       ┌─────┴─────┐  ┌─────┴─────┐  ┌───────────┐
       │  Drawer   │  │ Entrance  │  │  Web/PWA  │
@@ -88,7 +88,7 @@ Jetson Nano가 허브로서 판단·기록·서비스를 담당하고,
 | Jetson ↔ 카메라 | USB | 메인 유닛 내부 |
 | Jetson ↔ STM32 | USB Serial (ST-LINK VCP) | 메인 유닛 내부, 카메라·레이저 위치 고정 |
 | Jetson ↔ 서랍 노드 | **Bluetooth** (HC-06) | 같은 방 안 가구 — 근거리, 공유기 불필요 |
-| Jetson ↔ 출입 노드 | **Wi-Fi** (MQTT) | 다른 공간(현관) — 공유기 경유 |
+| Jetson ↔ 출입 노드 | **Wi-Fi** (인증 TCP client) | 다른 공간(현관) — 공유기 경유 |
 | Jetson ↔ Web / PWA | **Wi-Fi** (HTTP) | 사용자 화면 |
 | Jetson → 스마트폰 알림 | **Wi-Fi** (ntfy) | 화면이 꺼진 폰도 받아야 하는 알림 (폰 사이렌, 외출 알림) |
 
@@ -96,17 +96,9 @@ Jetson Nano가 허브로서 판단·기록·서비스를 담당하고,
 
 Jetson의 Bluetooth는 USB Bluetooth 4.0 동글(CSR8510)을 사용합니다.
 
-### MQTT 토픽
+### 현관 TCP client
 
-Wi-Fi 노드는 Jetson의 MQTT 브로커(Mosquitto)를 통해 이벤트와 명령을 주고받습니다.  
-새 노드는 Wi-Fi + MQTT 토픽 구독만으로 추가할 수 있습니다.
-
-| 토픽 | 방향 | 내용 |
-|---|---|---|
-| `retrace/entrance/motion` | 출입 노드 → Jetson | 움직임 감지 |
-| `retrace/entrance/light` | Jetson → 출입 노드 | `NORMAL` / `ALERT` |
-
-> 메시지 세부 형식(연결 상태 토픽 포함)은 [통신 프로토콜](docs/protocol.md)을 참고합니다.
+출입 노드는 Wi-Fi로 Jetson TCP 서버(기본 5000번)에 직접 접속합니다. `[ID:비밀번호]`로 로그인한 뒤 PIR 감지 시 `[SERVER]EVT@ENTRANCE:PIRON`을 전송하고, 서버에서 받은 `PING`, `NORMAL`, `ALERT`에 응답합니다. 상세 형식은 [통신 프로토콜](docs/protocol.md)을 참고합니다.
 
 ---
 
@@ -182,13 +174,12 @@ Jetson Nano (ntfy 서버)
 
 ```text
 출입 노드 PIR 감지
-   ↓ MQTT (retrace/entrance/motion)
+   ↓ Wi-Fi TCP (`EVT@ENTRANCE:PIRON`)
 Jetson Nano
    ↓
-차키 Last Seen 확인 → 아직 책상에 있음
-   ├─ MQTT (retrace/entrance/light: ALERT) → 현관등 경고 점등
-   ├─ USB Serial → STM32 레이저로 차키 안내
-   └─ ntfy → 폰의 ntfy 앱에 "차키 챙기셨나요?" 알림
+등록한 외출 물건의 Last Seen 확인
+   ├─ TCP (`ALERT`) → 현관등 경고 점등
+   └─ ntfy → 폰의 ntfy 앱에 준비물 알림
                  ↓
           Tasker: ntfy 앱 + Car Key Check 제목인 알림만 선택
                  ↓
@@ -219,9 +210,9 @@ Retrace-Project/
 │        └─ emergency_button.c         # 비상 버튼 → EVT:BTN:SOS
 │
 ├─ esp32/                              # ESP32 프로젝트 (PlatformIO · Arduino)
-│  ├─ entrance_node/                   # ESP32 #1 현관등 (Jetson ↔ Wi-Fi · MQTT)
+│  ├─ entrance_node/                   # ESP32 #1 현관등 (Jetson ↔ Wi-Fi · TCP)
 │  │  ├─ platformio.ini                # 보드 · 빌드 설정
-│  │  ├─ src/main.cpp                  # PIR · LED · Wi-Fi · MQTT
+│  │  ├─ src/main.cpp                  # PIR · LED · Wi-Fi · TCP client
 │  │  └─ include/
 │  │     ├─ entrance_control.h         # PIR 필터 · 센서등 · 경고 타이머
 │  │     └─ network_config.example.h   # Wi-Fi · Jetson 주소 설정 예제
@@ -251,10 +242,6 @@ Retrace-Project/
 ├─ CONTRIBUTING.md                     # 협업 규칙
 └─ README.md
 ```
-
-> 기능별 코드는 담당 feature 브랜치(STM32 = `feature/stm32`, ESP32 = `feature/esp32`, Jetson = `feature/jetson`, 웹 = `feature/web`)에 있습니다.
-
----
 
 ## 개발 문서
 

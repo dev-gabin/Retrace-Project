@@ -3,7 +3,7 @@
 > 각 보드가 주고받는 메시지 약속입니다. **보내는 쪽과 받는 쪽 모두 이 문서를 기준으로 구현합니다.**  
 > 문서와 다르게 동작하면 **문서와 다른 쪽이 수정**합니다. 변경이 필요하면 문서를 먼저 고치고 서로 공유합니다.
 >
-> 버전: **v0.7** — Jetson 저장 데이터·C Storage API는 `Retrace_API_Guide_v2.pdf` 기준이며, HTTP API·JSON은 초안입니다. 남은 확정 항목은 맨 아래 참고합니다.
+> 버전: **v0.8** — 현재 `develop` 구현 기준입니다.
 > 보드 핀 배정은 [pinmap.md](pinmap.md), 실행·검증 항목은 [통합 테스트 체크리스트](classroom_test_checklist.md)를 참고합니다.
 
 ---
@@ -14,7 +14,7 @@
 |---|---|---|---|
 | Jetson ↔ STM32 #1 메인 유닛 | USB Serial (VCP) | `stm32/main_unit` | `Stm32Link` |
 | Jetson ↔ STM32 #2 서랍 | Bluetooth (HC-06) | `stm32/drawer` | `DrawerLink` |
-| Jetson ↔ ESP32 #1 현관등 (LOLIN D32) | Wi-Fi · MQTT | `esp32/entrance_node` | `MqttLink` |
+| Jetson ↔ ESP32 #1 현관등 (LOLIN D32) | Wi-Fi · TCP | `esp32/entrance_node` | 인증 client |
 | Jetson → 스마트폰 | ntfy (HTTP) | - | `PhoneNotifier` |
 | Web/PWA ↔ Jetson | HTTP | - | `Server` |
 
@@ -159,41 +159,41 @@ STM32  → EVT:BTN:SOS
 
 ---
 
-## 4. Jetson ↔ ESP32 #1 현관등 (Wi-Fi · MQTT)
+## 4. Jetson ↔ ESP32 #1 현관등 (Wi-Fi · TCP)
 
 | 항목 | 값 |
 |---|---|
 | 보드 | LOLIN D32 (PIR + 현관등 LED) |
-| 브로커 | Jetson (Mosquitto), 포트 1883 |
-| 클라이언트 ID | `retrace-entrance` |
+| 서버 | Jetson `server_jetson`, 기본 포트 5000 |
+| 클라이언트 ID | `ENTRANCE` (설정 파일에서 변경 가능) |
 
-| 토픽 | 방향 | 내용 | QoS | Retain |
-|---|---|---|---|---|
-| `retrace/entrance/motion` | 현관등 → Jetson | `1` (움직임 감지) | 1 | X |
-| `retrace/entrance/light` | Jetson → 현관등 | `NORMAL` / `ALERT` | 1 | X |
-| `retrace/entrance/status` | 현관등 → Jetson | `online` / `offline` | 1 | O |
+연결 직후 `[ID:비밀번호]`로 로그인합니다. 이후 모든 송신은 줄바꿈으로 끝납니다.
 
-- `retrace/entrance/status`의 `offline`은 MQTT **Last Will**로 설정해, 현관등이 갑자기 꺼지면 브로커가 대신 알립니다.
-- **대소문자**: 토픽은 MQTT 관례대로 **소문자**, 우리가 정의한 명령 값(`NORMAL`/`ALERT`)은 **대문자**, 연결 상태(`online`/`offline`)는 **MQTT 관례(소문자)**를 따릅니다. 스마트홈 플랫폼(Home Assistant 등)의 기본 상태값과 같아서 연동 시 그대로 사용할 수 있습니다.
-- 평소 센서등 점등은 **현관등이 스스로** 처리하고, `ALERT`만 Jetson이 보냅니다.
-- `ALERT` 후 일정 시간이 지나면 현관등이 **스스로 `NORMAL`로 복귀**합니다.
+| 방향 | 메시지 | 내용 |
+|---|---|---|
+| 현관등 → Jetson | `[SERVER]EVT@ENTRANCE:PIRON` | 안정적인 PIR LOW → HIGH 감지 |
+| Jetson → 현관등 | `[발신자]PING` | 연결 확인 요청 |
+| 현관등 → Jetson | `[SERVER]OK@PING` | 연결 확인 응답 |
+| Jetson → 현관등 | `[발신자]NORMAL` / `[발신자]ALERT` | 기본 점등 / 경고 점멸 |
+| 현관등 → Jetson | `[SERVER]OK@LIGHT:NORMAL` / `[SERVER]OK@LIGHT:ALERT` | 조명 명령 접수 |
+
+- 평소 센서등 점등은 현관등이 자체 처리하고, `ALERT`만 Jetson이 보냅니다.
+- `ALERT`는 10초 후 자동으로 기본 센서등 상태로 복귀합니다.
 
 구현 기준 (`esp32/entrance_node`):
 
-- PIR은 50ms 필터 후 LOW → HIGH 전환마다 `motion = 1`을 한 번 발행합니다. HIGH 유지 중에는 중복 발행하지 않고, 안정적인 LOW 이후 다음 HIGH에서 다시 발행합니다.
-- 한 색 LED(GPIO25)는 PIR이 HIGH인 동안 켜지고, 안정적인 LOW 감지 후 **10초** 유지합니다.
+- PIR은 50ms 필터 후 LOW → HIGH 전환마다 `EVT@CLIENT_ID:PIRON`을 한 번 전송합니다. HIGH 유지 중에는 중복 전송하지 않습니다.
+- 한 색 LED(GPIO25)는 PIR이 HIGH인 동안 켜지고, 안정적인 LOW 감지 후 **7초** 유지합니다.
 - `ALERT`는 **250ms마다 ON/OFF**하며 **10초** 후 기본 센서등 모드로 복귀합니다. 새 `ALERT`는 시간을 갱신하고 ON부터 다시 시작합니다. `NORMAL`은 경고를 취소하며, PIR 점등 조건이 남아 있으면 LED는 켜져 있습니다.
 - 시간은 `src/main.cpp` 맨 위의 임시 상수로, 강의실에서 조정합니다.
-- 명령은 대문자 `NORMAL` / `ALERT`와 정확히 일치해야 합니다. 줄 끝·공백·소문자·잘못된 값과 Retain 명령은 무시합니다.
-- ESP-MQTT로 motion 발행·light 구독·status 및 Last Will에 **QoS 1**을 사용합니다. status는 Retain, motion과 light는 Retain 없이 사용합니다.
-- Wi-Fi·MQTT 대기는 별도 태스크에서 처리합니다. 연결이 없어도 기본 PIR 센서등과 경고 복귀 타이머는 계속 동작합니다. 연결 중 새 움직임을 전송하며, 새 오프라인 움직임은 저장하지 않습니다. 이미 MQTT에 넣은 QoS 1 메시지는 재전송될 수 있습니다.
+- 명령은 대문자 `NORMAL` / `ALERT`와 정확히 일치해야 합니다.
+- Wi-Fi·TCP 연결은 별도 태스크에서 처리합니다. 연결이 없어도 기본 PIR 센서등과 경고 복귀 타이머는 계속 동작합니다. 서버 연결은 5초 간격으로 재시도하며, 5초 이상 지난 PIR 이벤트는 버립니다.
 - Wi-Fi·Jetson 주소는 Git에서 제외되는 `include/network_config.h`에 설정합니다. 예제 설정이 비어 있으면 기본 PIR 센서등만 동작합니다.
 
-테스트 (Jetson 터미널):
+연결 확인 (Jetson TCP client에서):
 
-```bash
-mosquitto_sub -h localhost -t "retrace/#" -v
-mosquitto_pub -h localhost -q 1 -t retrace/entrance/light -m ALERT
+```text
+[SERVER]PING@ENTRANCE
 ```
 
 ---
@@ -220,7 +220,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 
 ---
 
-## 6. Web/PWA ↔ Jetson (HTTP API) — 초안
+## 6. Web/PWA ↔ Jetson (HTTP API)
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
@@ -232,7 +232,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 
 ### 6-1. 웹 뼈대에서 사용하는 JSON 임시안
 
-`feature/web`의 화면과 샘플 데이터는 아래 형식을 사용합니다. **기존 메서드·경로는 유지하며, 아래 JSON은 Jetson 담당자 합의 전 임시안입니다.** 서버에 이미 다른 형식이 있다면 이 문서와 `web/api.js`를 함께 맞춥니다. Jetson 서버 구현 완료를 의미하지 않습니다.
+`web` 화면과 Jetson의 `vision/http_api.py`는 아래 메서드·경로를 사용합니다.
 
 저장 데이터의 시각·사진 경로·좌표·서랍 번호 표현은 7장의 Storage API 기준에 맞춥니다. `Retrace_API_Guide_v2.pdf`는 Jetson 내부 C API를 정의하므로, HTTP 경로·JSON 구조·HTTP 오류 코드와 저장 모듈 반환 코드의 변환은 웹·Jetson 담당자가 별도로 확정합니다.
 
@@ -243,7 +243,7 @@ curl -H "Priority: 5" -H "Title: Retrace SOS" -d "폰을 찾고 있어요!" http
 | `POST /api/items/{item}/aim` | `{}` | `{ "ok": true }` 또는 `NO_POSITION` / `LASER_UNAVAILABLE` 오류 |
 | `POST /api/drawers/{n}/open` | `{}` | `{ "ok": true }` |
 
-POST는 `Content-Type: application/json`을 사용합니다. 웹은 UART·MQTT를 직접 제어하지 않습니다. 레이저 안내는 웹 버튼 요청 시 저장된 카메라 좌표를 사용하며 최대 5초 점등 후 소등·중앙 복귀합니다. 마지막 확인 사진과 시각도 유지합니다. PIR·현관등·폰 알림 경로에서 레이저를 자동으로 켜지 않습니다.
+POST는 `Content-Type: application/json`을 사용합니다. 웹은 UART·장치 TCP 연결을 직접 제어하지 않습니다. 레이저 안내는 웹 버튼 요청 시 저장된 카메라 좌표를 사용하며 최대 5초 점등 후 소등·중앙 복귀합니다. 마지막 확인 사진과 시각도 유지합니다. PIR·현관등·폰 알림 경로에서 레이저를 자동으로 켜지 않습니다.
 
 `LastSeen` 예제 (7장 필드 이름 사용):
 
@@ -267,7 +267,7 @@ POST는 `Content-Type: application/json`을 사용합니다. 웹은 UART·MQTT�
 - `observed`와 `has_position`은 C 조회 구조체의 판별 필드입니다. HTTP 응답에 이 필드를 직접 포함할지와 JSON 타입은 웹·Jetson 담당자가 확정합니다.
 - `{ "ok": true }`는 **서버의 요청 접수 응답**이며, 실제 서보 이동·레이저 점등 완료를 뜻하지 않습니다. 보드 응답 대기·장치 오류 처리 방식은 Jetson 담당자가 추가로 확정합니다.
 - 실패는 HTTP 4xx/5xx와 `{ "error": { "code": "ITEM_NOT_FOUND", "message": "물건 기록이 없습니다." } }` 형태의 임시안을 사용합니다. 웹은 실패·시간 초과를 표시하며, 실제 연결 실패 시 샘플 성공으로 바꾸지 않습니다.
-웹 기본 설정은 샘플 모드이며 실제 API 요청을 보내지 않습니다. 실행·연동 전환·검증 방법은 [feature/web의 웹 인계 문서](https://github.com/dev-gabin/Retrace-Project/blob/feature/web/web/README.md)를 참고합니다. 웹 코드와 인계 문서는 `feature/web`에서 관리하며, 이 프로토콜 문서는 각 브랜치에서 공통으로 공유합니다.
+웹 기본 설정은 샘플 모드이며 실제 API 요청을 보내지 않습니다. 실행·연동 전환·검증 방법은 [`web/README.md`](../web/README.md)를 참고합니다.
 
 ---
 
@@ -367,10 +367,10 @@ POST는 `Content-Type: application/json`을 사용합니다. 웹은 UART·MQTT�
 ## 확정 필요 항목
 
 - [ ] HC-06 실제 통신 속도 (기본 9600인지 모듈 확인)
-- [ ] 서랍 LED 10초 소등 / 현관등 기본 점등 10초·ALERT 10초·깜빡임 250ms를 실물에 맞춰 보정
+- [ ] 서랍 LED 10초 소등 / 현관등 기본 점등 7초·ALERT 10초·깜빡임 250ms를 실물에 맞춰 최종 확인
 - [ ] ntfy 서버 포트
-- [ ] HTTP API JSON 임시안(6-1)을 Jetson·웹 담당자가 함께 확정, 장치 오류·완료 응답 방식 정의
-- [ ] Storage API의 `observed`·`has_position`과 반환 코드를 HTTP JSON·상태 코드로 변환하는 규칙 확정
+- [x] HTTP API 경로·JSON과 장치 오류 응답 구현
+- [x] Storage 응답을 HTTP JSON·상태 코드로 변환
 - [ ] 추적 물건 목록 최종 확정 (안경 / 지갑)
 
 ---
@@ -386,3 +386,4 @@ POST는 `Content-Type: application/json`을 사용합니다. 웹은 UART·MQTT�
 | v0.5 | 현관등 PIR·ALERT·QoS 1 구현 기준 명시 |
 | v0.6 | `Retrace_API_Guide_v2.pdf` 기준으로 MariaDB·C Storage API, 관측 여부·좌표 여부, UTC 시각·사진 경로, 반환 코드·복구 규칙 반영. 관련 Last Seen JSON 예제 수정, HTTP 형식은 초안 유지 |
 | v0.7 | 사용하지 않는 ESP32-C3 태그 관련 연결·API 초안 제거, 이후 장 번호 정리 |
+| v0.8 | 현관등 통신을 MQTT에서 인증 TCP client로 변경하고 구현된 HTTP API 기준으로 갱신 |
