@@ -1,14 +1,13 @@
 # Retrace 핀맵
 
-> Retrace 프로젝트의 MCU 보드 4개(STM32 ×2, ESP32 ×2) 핀 배정과 설정 정리.  
+> Retrace 프로젝트의 MCU 보드 3개(STM32 ×2, ESP32 ×1) 핀 배정과 설정 정리.
 > 메시지 형식은 [protocol.md](protocol.md)를 참고합니다. Jetson Nano는 USB 장치만 연결하므로 핀맵 대상이 아닙니다.
 
 | 보드 | 역할 | 프로젝트 폴더 | Jetson 연결 | 상태 |
 |---|---|---|---|---|
 | **STM32 #1** (NUCLEO-F411RE) | 메인 유닛 (Pan/Tilt 서보, 레이저, PIR) | `stm32/main_unit` | USB Serial (VCP) | 펌웨어·빌드 완료 / 실물 확인 전 |
 | **STM32 #2** (NUCLEO-F411RE) | 서랍 노드 (서보 ×6, LED ×6, 비상 버튼) | `stm32/drawer` | Bluetooth (HC-06) | 펌웨어·빌드 완료 / 실물 확인 전 |
-| **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25 구현·빌드 완료 / 실물 확인 전 |
-| **ESP32 #2** (ESP32-C3 Super Mini) | 부저 태그 (부저) | `esp32/buzzer_tag` | BLE | GPIO3 구현·빌드 완료 / 실물 확인 전 |
+| **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED ×4) | `esp32/entrance_node` | Wi-Fi · MQTT | GPIO34/25/26/27/32 구현·빌드 완료 / 실물 확인 전 |
 
 ---
 
@@ -216,13 +215,13 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 |---|---|
 | 서랍 팝업 서보 | SG90 ×6, PCA9685의 CH0~CH5로 제어 |
 | 서랍 LED | LED ×6, 열린 서랍 표시 (타이머 자동 소등) |
-| 비상 버튼 | 폰 사이렌 요청 (`EVT:BTN:SOS`) |
+| 비상 버튼 | Jetson 서버 로그 이벤트 (`EVT@clientID:SOS`); 폰 사이렌은 후속 구현 |
 | Jetson 통신 | HC-06 Bluetooth (USART1) (`protocol.md` 3장) |
 | PC 테스트 | ST-LINK VCP (USART2) — 명령 수신 · 응답 및 SOS 이벤트 |
 
 ### 3-2. 서랍 번호
 
-`protocol.md`의 `DRAWER:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
+`protocol.md`의 `clientID:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
 
 ```text
 ┌─────────┬─────────┐
@@ -416,10 +415,13 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 | 부품 | 핀 | 설정 | 코드 상수 |
 |---|---|---|---|
 | PIR 출력 | **GPIO34** | `INPUT` | `PIR_PIN` |
-| 현관등 LED | **GPIO25** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PIN` |
+| 현관등 LED 1 | **GPIO25** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[0]` |
+| 현관등 LED 2 | **GPIO26** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[1]` |
+| 현관등 LED 3 | **GPIO27** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[2]` |
+| 현관등 LED 4 | **GPIO32** | `OUTPUT`, 초기 LOW, 한 색 LED | `LIGHT_PINS[3]` |
 
 - **PIR → GPIO34**: 입력 전용 핀이라 센서 입력에 적합. 내부 풀다운이 없으므로 센서가 빠졌을 때 오작동이 걱정되면 **외부 10kΩ 풀다운** 추가
-- **현관등 LED**: 한 색 LED, GPIO25로 구현. 전류 제한 저항 필요. 실제 LED 종류·구동 회로는 강의실에서 확인.
+- **현관등 LED ×4**: GPIO25/26/27/32로 동시에 제어. LED마다 220~330Ω 전류 제한 저항을 하나씩 직렬 연결.
 
 - PIR 50ms 필터, 움직임 종료 후 10초 점등 유지. `ALERT`는 250ms마다 ON/OFF하며 10초 후 기본 센서등 모드로 복귀 (시간은 코드 맨 위 임시 상수).
 - Wi-Fi·MQTT가 없어도 기본 센서등 동작. 실제 업로드·PIR·LED·네트워크 검증은 강의실에서 진행.
@@ -439,52 +441,14 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 - [x] PIR 센서등·시간 유지·NORMAL/ALERT·Wi-Fi/MQTT·재연결 구현
 - [x] 기본·네트워크 활성화 빌드 성공·경고 0개
 - [ ] 개인 `network_config.h`에 Wi-Fi·Jetson IP 입력 후 실제 보드용 `lolin_d32` 재빌드·업로드
-- [ ] PIR·LED 구동, 실제 MQTT 발행·구독·연결 유실 검증
+- [ ] PIR·LED ×4 구동, 실제 MQTT 발행·구독·연결 유실 검증
 
 ---
 
-## 6. ESP32 #2 부저 태그 (ESP32-C3 Super Mini)
-
-### 6-1. 담당 기능
-
-| 기능 | 설명 |
-|---|---|
-| 부저 | Jetson BLE 신호(`1`/`0`) 수신 → 부저 ON/OFF. 시간 제한 없이 울리며, 웹의 끄기 요청(`0`) 또는 BLE 연결 해제 감지 시 정지 |
-| Jetson 통신 | BLE (`protocol.md` 5장) |
-
-### 6-2. 코드에 반영한 핀 배정 (실물 검증 전)
-
-| 부품 | 핀 | 설정 | 코드 상수 |
-|---|---|---|---|
-| 부저 | **GPIO3** | `OUTPUT`, 초기 LOW | `BUZZER_PIN` |
-
-- 예비 후보: GPIO4
-
-### 6-3. 배선 메모
-
-| 항목 | 내용 | 상태 |
-|---|---|---|
-| 부저 종류 | **액티브 부저** (전압만 주면 울림) 권장 | 확인 필요 |
-| 구동 | 부저 전류가 크면 **NPN 트랜지스터**(예: S8050 + 베이스 저항 1kΩ)로 구동 | 확인 필요 (부저 전류) |
-| 전원 | 태그라 배터리 필요 (소형 리튬 배터리 등) | 확인 필요 |
-| 납땜 | 보드가 **핀헤더 미납땜** 제품 → 납땜 필요 | |
-
----
-
-### 6-4. 진행 상황
-
-- [x] BLE 1/0·시간 제한 없는 울림·연결 해제 시 정지·재광고 구현
-- [x] 빌드 성공·경고 0개
-- [ ] 실제 부저 종류·전류·전원·보드 USB 업로드 확인
-- [ ] BLE 연결·소리·지속 울림·끄기·재연결 실물 검증
-
----
-
-## 7. 전체 확인 필요 항목
+## 6. 전체 확인 필요 항목
 
 - [ ] STM32 #1: 레이저 모듈 전류, PIR 모델, SG90 동작 범위
 - [ ] STM32 #2: PCA9685 I2C 연결·주소, 서랍 실제 배치, HC-06 통신 속도, 서보 밀기·복귀 펄스와 시간 보정, PB1 미사용 이유
-- [ ] ESP32 #1: PIR 모델, 한 색 LED 구동 회로·실제 점등, Wi-Fi/MQTT 연결
-- [ ] ESP32 #2: 부저 종류·전류, 배터리
+- [ ] ESP32 #1: PIR 모델, 한 색 LED ×4 구동 회로·실제 점등, Wi-Fi/MQTT 연결
 
 실행 항목과 결과 기록은 [강의실 통합 테스트](classroom_test_checklist.md)에서 관리합니다. 보드 단독 검증 후 feature → develop PR로 기능을 통합하고 Jetson·웹과 전체 연동을 확인합니다.
