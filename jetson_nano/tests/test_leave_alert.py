@@ -119,7 +119,7 @@ class BuildRequestTest(unittest.TestCase):
         self.assertEqual(request.get_method(), "POST")
         self.assertEqual(request.data, "차키, 지갑 챙기셨나요?".encode("utf-8"))
         self.assertEqual(request.get_header("Title"), "Retrace Leave Check")
-        self.assertEqual(request.get_header("Priority"), "4")
+        self.assertEqual(request.get_header("Priority"), "5")
         self.assertEqual(request.get_header("Authorization"), "Bearer tk")
 
 
@@ -184,7 +184,7 @@ class DeviceEventHandlerTest(LeaveAlertTestCase):
         handler, _, store, _, notifier, _ = self.make_handler([], ["car_key"])
         handler.handle(DeviceEvent("DRAWER", "EVT@DRAWER:SOS"))
         self.assertEqual(len(notifier.sent), 1)
-        self.assertEqual(notifier.sent[0].priority, 5)
+        self.assertEqual(notifier.sent[0].priority, 4)
         self.assertEqual(store.commands, [])
 
 
