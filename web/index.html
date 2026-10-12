@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#ffffff">
-  <meta name="description" content="물건의 마지막 목격 정보를 확인하고 레이저·서랍·부저로 찾아보세요.">
+  <meta name="description" content="물건의 마지막 확인 사진과 시각을 보고 서랍·부저로 찾아보세요.">
   <title>Retrace — 물건 찾기</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232563eb'/%3E%3Cpath d='M9 9h8a5 5 0 010 10h-3l7 7M9 23V9' fill='none' stroke='white' stroke-width='3'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./styles.css">
@@ -44,6 +44,16 @@
     <div id="load-error" class="error-notice" role="alert" hidden></div>
     <div class="workspace">
       <div class="find-column">
+        <section class="leave-register-card" aria-labelledby="leave-register-title">
+          <div class="section-heading"><div><p class="eyebrow">LEAVE CHECK</p><h2 id="leave-register-title">외출 확인 물건 등록</h2></div><span class="section-caption">카메라 인식 전에도 등록할 수 있어요</span></div>
+          <p class="leave-register-copy">외출할 때 챙길 물건을 미리 선택해 두면, 외출 감지 시 책상에 남아 있는지 확인해 알려드려요.</p>
+          <div class="leave-register-controls">
+            <label class="visually-hidden" for="leave-item-select">외출 확인 물건 선택</label>
+            <select id="leave-item-select"></select>
+            <button class="button button-secondary" id="leave-item-add-button" type="button">등록</button>
+          </div>
+          <div id="leave-item-list" class="leave-item-list" aria-live="polite"></div>
+        </section>
         <section id="items" class="items-section" aria-labelledby="items-title">
           <div class="section-heading"><h2 id="items-title">내 물건 <span id="item-count" class="count">—</span></h2><span class="section-caption">하나를 선택해 찾아보세요</span></div>
           <label class="search-field"><svg class="icon" aria-hidden="true"><use href="#icon-search"/></svg><span class="visually-hidden">물건 이름 검색</span><input id="search-input" type="search" placeholder="어떤 물건을 찾고 있나요?" autocomplete="off"></label>
@@ -59,17 +69,20 @@
             <span class="scene-target" id="scene-target" hidden><span></span><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span id="target-label">차키</span></span>
           </div>
           <div class="detail-body"><div class="selected-summary"><div><h3 id="selected-name">물건을 선택해 주세요</h3><p id="selected-location">마지막 기록을 확인할 수 있어요.</p></div><span id="relative-time" class="time-pill">—</span></div>
-            <dl class="record-metadata"><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg>마지막 목격</dt><dd id="seen-at">—</dd></div><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-pin"/></svg>기록 위치</dt><dd id="record-location">—</dd></div></dl>
-            <button class="button button-primary detail-action" id="aim-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span>레이저로 위치 안내</span><svg class="icon action-arrow" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+            <dl class="record-metadata"><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-clock"/></svg><span id="record-time-label">마지막 확인 시각</span></dt><dd id="seen-at">—</dd></div><div><dt><svg class="icon" aria-hidden="true"><use href="#icon-pin"/></svg>기록 위치</dt><dd id="record-location">—</dd></div></dl>
+            <button class="button button-primary detail-action" id="photo-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-image"/></svg><span>마지막 사진 크게 보기</span><svg class="icon action-arrow" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+            <button class="button button-secondary detail-action" id="aim-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span>레이저로 위치 안내</span></button>
+            <p class="action-help" id="aim-help">카메라에 기록된 좌표가 있을 때 레이저 안내를 요청할 수 있어요.</p>
+            <button class="button button-secondary detail-action speech-action" id="record-speech-button" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-sound"/></svg><span>보관·확인 시각 읽어주기</span></button>
             <button class="text-button" id="related-drawer-button" type="button" hidden>기록된 서랍 선택하기</button>
-            <p class="action-help" id="aim-help">선택한 물건의 마지막 위치로 안내를 요청해요.</p>
+            <p class="action-help" id="photo-help">사진과 확인 시각으로 어디에 두었는지 살펴보세요.</p>
           </div>
         </section>
       </div>
       <aside class="controls-column" aria-label="찾기 도구">
         <section class="tool-card drawer-card" id="drawer" aria-labelledby="drawer-title">
           <div class="tool-title"><span class="tool-icon"><svg class="icon" aria-hidden="true"><use href="#icon-drawer"/></svg></span><div><p class="eyebrow">SMART DRAWER</p><h2 id="drawer-title">서랍에서 찾기</h2></div></div>
-          <p class="tool-copy">찾고 싶은 서랍을 선택해 살짝 열어보세요.</p>
+          <p class="tool-copy">물건 등록 없이도 서랍 번호를 선택해 열 수 있어요.</p>
           <div class="drawer-orientation" aria-hidden="true"><span>왼쪽</span><span>오른쪽</span></div>
           <div class="drawer-grid" aria-label="서랍 번호 선택">
             <button type="button" class="drawer-cell is-selected" data-drawer="1" aria-pressed="true" aria-label="1번 서랍, 상단 왼쪽"><span>01</span><i></i></button>
@@ -80,6 +93,16 @@
             <button type="button" class="drawer-cell" data-drawer="6" aria-pressed="false" aria-label="6번 서랍, 하단 오른쪽"><span>06</span><i></i></button>
           </div>
           <button id="drawer-open-button" class="button button-secondary full-width" type="button"><span>1번 서랍 열기</span><svg class="icon" aria-hidden="true"><use href="#icon-arrow"/></svg></button>
+          <label class="drawer-storage-label" for="drawer-item-select">물건 보관 등록</label>
+          <select id="drawer-item-select" aria-label="보관할 물건 선택"></select>
+          <div class="drawer-custom-controls">
+            <label class="visually-hidden" for="drawer-custom-name">목록에 없는 물건 이름</label>
+            <input id="drawer-custom-name" type="text" maxlength="40" placeholder="직접 입력 예: 여권" autocomplete="off">
+            <button id="drawer-custom-add-button" class="button button-secondary" type="button" disabled>추가·보관</button>
+          </div>
+          <div class="drawer-actions">
+            <button id="drawer-store-button" class="button button-primary" type="button" disabled>보관 등록</button>
+          </div>
           <p class="tool-footnote">서랍은 자동으로 닫히지 않아요.</p>
         </section>
         <section class="tool-card buzzer-card" id="buzzer" aria-labelledby="buzzer-title">
@@ -94,6 +117,12 @@
     </div>
     <footer class="page-footer"><span>retrace<span class="brand-dot">.</span> <span class="footer-copy">작은 기억이, 다시 찾는 순간으로.</span></span><span id="footer-mode">샘플 미리보기 · 실제 기기 제어 없음</span></footer>
   </main>
+  <dialog class="photo-dialog" id="photo-dialog" aria-labelledby="photo-dialog-title" aria-describedby="photo-dialog-time photo-dialog-note">
+    <div class="photo-dialog-heading"><h2 id="photo-dialog-title">마지막 확인 사진</h2><button class="button button-secondary" id="photo-dialog-close" type="button" autofocus>닫기</button></div>
+    <p id="photo-dialog-time"></p>
+    <img id="photo-dialog-image" alt="">
+    <p id="photo-dialog-note">저장된 마지막 사진이에요. 확인 이후 물건이 이동했을 수 있어요.</p>
+  </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <noscript><p class="error-notice">화면 동작을 확인하려면 JavaScript를 켜주세요.</p></noscript>
 </body>

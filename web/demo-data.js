@@ -7,13 +7,35 @@ export const demoItems = [
 ];
 
 export function createDemoTransport() {
+  const items = structuredClone(demoItems);
   let buzzerEnabled = false;
+  let leaveItems = ['carkey'];
   return {
-    async listItems() { return { items: structuredClone(demoItems) }; },
-    async getItem(item) { return structuredClone(demoItems.find(record => record.item === item)); },
-    async aim() { return { ok: true }; },
-    async openDrawer() { return { ok: true }; },
+    async listItems() { return { items: structuredClone(items) }; },
+    async getItem(item) { return structuredClone(items.find(record => record.item === item)); },
+    async createDrawerItem(name, n) {
+      const existing = items.find(record => record.item.startsWith('custom_') && record.display_name === name);
+      const item = existing?.item ?? 'custom_' + crypto.randomUUID().replaceAll('-', '').slice(0, 24);
+      await this.storeDrawer(item, n);
+      items.find(record => record.item === item).display_name = name;
+      return { ok: true, item, display_name: name };
+    },
+    async storeDrawer(item, n) {
+      let record = items.find(record => record.item === item);
+      if (!record) { record = { item }; items.push(record); }
+      Object.assign(record, { drawer_id: n, pos_x: null, pos_y: null, snapshot: null, seen_at: new Date().toISOString(), state: 'occluded' });
+      return { ok: true };
+    },
+    async openDrawer(n) {
+      for (const record of items.filter(record => record.drawer_id === n)) {
+        Object.assign(record, { drawer_id: null, pos_x: null, pos_y: null, snapshot: null, seen_at: null, state: 'uncertain' });
+      }
+      return { ok: true };
+    },
     async setBuzzer(enabled) { buzzerEnabled = enabled; return { ok: true }; },
+    async aim() { return { ok: true }; },
+    async getLeaveItems() { return { items: [...leaveItems] }; },
+    async setLeaveItems(items) { leaveItems = [...new Set(items)]; return { ok: true, items: [...leaveItems] }; },
     get buzzerEnabled() { return buzzerEnabled; },
   };
 }

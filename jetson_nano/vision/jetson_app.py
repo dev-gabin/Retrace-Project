@@ -4,11 +4,15 @@ import time
 
 import cv2
 
+from communication.phone_notifier import PhoneNotifier, PhoneNotifierError
+from communication.server_events import ServerEventError, ServerEventListener
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenStore
+from record.leave_items import LeaveItems
 from vision.aim_mapper import AimMapper
 from vision.detector import YoloDetector
 from vision.http_api import RetraceHttpServer
+from vision.leave_alert import DeviceEventHandler, LeaveVerifier
 from vision.object_tracker import StableObjectTracker
 
 
@@ -17,10 +21,11 @@ REPOSITORY_DIR = JETSON_DIR.parent
 MODEL_PATH = JETSON_DIR / "models" / "yolo" / "coco83_yolo26n_v6_demo_desk.pt"
 
 CAMERA_INDEX = 0
-CONFIDENCE = 0.40
+CONFIDENCE = 0.60
 IMAGE_SIZE = 640
 PERSON_ENTER_CONFIDENCE = 0.55
 PERSON_KEEP_CONFIDENCE = 0.40
+PERSON_MISS_GRACE_SECONDS = 3.0
 PERSON_GRACE_SECONDS = 10.0
 
 
@@ -31,7 +36,7 @@ def main() -> None:
 
     print(f"[MODEL] {MODEL_PATH}")
     detector = YoloDetector(MODEL_PATH, CONFIDENCE, IMAGE_SIZE)
-    tracker = StableObjectTracker()
+    tracker = StableObjectTracker(stable_frames=2)
 
     storage = None
     stm32 = None
@@ -66,7 +71,7 @@ def main() -> None:
     # 카메라 자동 노출 안정화 및 초기 불완전 프레임 제거
     time.sleep(1.0)
     warmup_frame = None
-    for _ in range(30):
+    for _ in range(10):
         ok, candidate = camera.read()
         if ok:
             warmup_frame = candidate
@@ -77,14 +82,20 @@ def main() -> None:
         storage.close()
         return
 
+    leave_items = LeaveItems(storage.data_dir / "leave_items.json")
     frame_height, frame_width = warmup_frame.shape[:2]
+    mapper = None
     try:
         mapper = AimMapper.from_env(frame_width, frame_height)
+    except ValueError as error:
+        print(f"[LASER] 좌표 보정 오류로 웹 레이저 안내 끔: {error}")
+    try:
         http_server = RetraceHttpServer.from_env(
             storage,
-            stm32,
-            mapper,
             REPOSITORY_DIR / "web",
+            leave_items,
+            stm32=stm32,
+            mapper=mapper,
         )
         http_server.start()
     except (OSError, ValueError) as error:
@@ -97,11 +108,32 @@ def main() -> None:
     http_host, http_port = http_server.address
     print(f"[HTTP] http://{http_host}:{http_port}")
 
+    # 현관 PIR·SOS 이벤트와 ntfy 알림은 설정이 없으면 끄고 나머지 기능은 계속 동작한다.
+    notifier = None
+    event_listener = None
+    event_handler = None
+    leave_verifier = None
+    try:
+        notifier = PhoneNotifier.from_env()
+        if notifier is None:
+            print("[NTFY] RETRACE_NTFY_TOPIC 없음; 폰 알림 끔")
+        else:
+            notifier.start()
+        event_listener = ServerEventListener.from_env()
+        event_listener.start()
+        leave_verifier = LeaveVerifier.from_env()
+        event_handler = DeviceEventHandler.from_env(
+            storage, notifier, leave_items, leave_verifier
+        )
+    except (PhoneNotifierError, ServerEventError, ValueError) as error:
+        print(f"[EVENT] 현관·SOS 이벤트 처리 끔: {error}")
+        event_listener = None
+
     state = "IDLE"
     pir_high = False
     state_started = time.monotonic()
     last_person_seen: float | None = None
-    person_window: deque[bool] = deque(maxlen=5)
+    person_window: deque[bool] = deque(maxlen=3)
 
     print("[START] PIR-triggered Jetson YOLO mode (Ctrl+C: 종료)")
 
@@ -126,11 +158,23 @@ def main() -> None:
                 elif event == "EVT@PIR:0":
                     pir_high = False
 
-            if state == "IDLE":
+            while event_listener is not None and event_handler is not None:
+                device_event = event_listener.get_event(timeout=0)
+                if device_event is None:
+                    break
+                event_handler.handle(device_event)
+
+            should_verify_leave = leave_verifier is not None and leave_verifier.active()
+            if state == "IDLE" and not should_verify_leave:
                 continue
 
             now = time.monotonic()
             detections = detector.detect(frame)
+            if leave_verifier is not None:
+                leave_verifier.observe(detections)
+
+            if state == "IDLE":
+                continue
             person_confidence = max(
                 (
                     detection["confidence"]
@@ -142,7 +186,7 @@ def main() -> None:
 
             if state == "SEARCHING":
                 person_window.append(person_confidence >= PERSON_ENTER_CONFIDENCE)
-                if len(person_window) == 5 and sum(person_window) >= 3:
+                if len(person_window) >= 2 and sum(person_window) >= 2:
                     state = "ACTIVE"
                     last_person_seen = now
                     print("[STATE] ACTIVE")
@@ -159,9 +203,10 @@ def main() -> None:
             else:
                 if last_person_seen is None:
                     last_person_seen = now
-                if state != "GRACE":
-                    print("[STATE] GRACE")
-                state = "GRACE"
+                if state != "ACTIVE" or now - last_person_seen >= PERSON_MISS_GRACE_SECONDS:
+                    if state != "GRACE":
+                        print("[STATE] GRACE")
+                    state = "GRACE"
                 if not pir_high and now - last_person_seen >= PERSON_GRACE_SECONDS:
                     state = "IDLE"
                     tracker.reset_stability()
@@ -216,6 +261,10 @@ def main() -> None:
         camera.release()
         if http_server is not None:
             http_server.close()
+        if event_listener is not None:
+            event_listener.close()
+        if notifier is not None:
+            notifier.close()
         try:
             stm32.laser(False)
         except Stm32LinkError:

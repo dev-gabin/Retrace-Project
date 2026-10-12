@@ -15,6 +15,8 @@ from urllib.parse import unquote, urlsplit
 
 from communication.stm32_link import Stm32Link, Stm32LinkError
 from record.last_seen import LastSeenError, LastSeenRecord, LastSeenStore
+from record.leave_items import LeaveItems
+from record.drawer_items import DrawerItems
 from vision.aim_mapper import AimMapper
 
 
@@ -34,14 +36,15 @@ class RetraceHttpServer:
     def __init__(
         self,
         storage: LastSeenStore,
-        stm32: Stm32Link,
-        mapper: AimMapper,
         *,
+        stm32: Stm32Link | None = None,
+        mapper: AimMapper | None = None,
         web_root: Path,
         host: str = "0.0.0.0",
         port: int = 8080,
         drawer_target: str = "DRAWER",
         buzzer_target: str = "TOKEN",
+        leave_items: LeaveItems | None = None,
         laser_seconds: float = 5.0,
     ) -> None:
         if not 0 < laser_seconds <= 5.0:
@@ -49,10 +52,13 @@ class RetraceHttpServer:
         self.storage = storage
         self.stm32 = stm32
         self.mapper = mapper
+        self.laser_seconds = laser_seconds
+        self._aim_lock = threading.Lock()
+        self.drawer_items = DrawerItems(storage.data_dir / "drawer_items.json")
+        self.leave_items = leave_items
         self.web_root = Path(web_root).resolve()
         self.drawer_target = drawer_target
         self.buzzer_target = buzzer_target
-        self.laser_seconds = laser_seconds
         handler = self._make_handler()
         self._server = ThreadingHTTPServer((host, port), handler)
         self._server.daemon_threads = True
@@ -66,19 +72,22 @@ class RetraceHttpServer:
     def from_env(
         cls,
         storage: LastSeenStore,
-        stm32: Stm32Link,
-        mapper: AimMapper,
         web_root: Path,
+        leave_items: LeaveItems | None = None,
+        *,
+        stm32: Stm32Link | None = None,
+        mapper: AimMapper | None = None,
     ) -> "RetraceHttpServer":
         return cls(
             storage,
-            stm32,
-            mapper,
+            stm32=stm32,
+            mapper=mapper,
             web_root=web_root,
             host=os.environ.get("RETRACE_HTTP_HOST", "0.0.0.0"),
             port=int(os.environ.get("RETRACE_HTTP_PORT", "8080")),
             drawer_target=os.environ.get("RETRACE_DRAWER_CLIENT_ID", "DRAWER"),
             buzzer_target=os.environ.get("RETRACE_BUZZER_CLIENT_ID", "TOKEN"),
+            leave_items=leave_items,
             laser_seconds=float(os.environ.get("RETRACE_LASER_SECONDS", "5.0")),
         )
 
@@ -164,11 +173,15 @@ class RetraceHttpServer:
     def _handle_get(self, request: BaseHTTPRequestHandler) -> None:
         path = unquote(urlsplit(request.path).path)
         if path == "/api/items":
-            self._send_json(
-                request,
-                HTTPStatus.OK,
-                {"items": [asdict(record) for record in self.storage.list_items()]},
-            )
+            records = {record.item: record for record in self.storage.list_items()}
+            with self.drawer_items.lock:
+                for item in self.drawer_items.entries:
+                    records.setdefault(item, self._unseen_item(item))
+                items = [self._item_json(self.drawer_items.apply(record)) for record in records.values()]
+            self._send_json(request, HTTPStatus.OK, {"items": items})
+            return
+        if path == "/api/leave-items":
+            self._send_json(request, HTTPStatus.OK, {"items": self._leave_items().get()})
             return
         if path.startswith("/api/items/"):
             item = path[len("/api/items/"):]
@@ -176,7 +189,7 @@ class RetraceHttpServer:
             self._send_json(
                 request,
                 HTTPStatus.OK,
-                asdict(self._get_item(item)),
+                self._item_json(self._get_item(item)),
             )
             return
         if path.startswith("/snapshots/"):
@@ -186,19 +199,50 @@ class RetraceHttpServer:
 
     def _handle_post(self, request: BaseHTTPRequestHandler) -> None:
         path = unquote(urlsplit(request.path).path)
+        if path == "/api/drawer-items":
+            body = self._read_json_object(request)
+            if set(body) != {"name", "drawer_id"}:
+                raise ValueError("name과 drawer_id가 필요합니다.")
+            item = self.drawer_items.add_custom(body["name"], body["drawer_id"])
+            self._send_json(request, HTTPStatus.OK, {"ok": True, "item": item,
+                            "display_name": self.drawer_items.display_name(item)})
+            return
+        if path == "/api/leave-items":
+            body = self._read_json_object(request)
+            if set(body) != {"items"}:
+                raise HttpApiError(
+                    HTTPStatus.BAD_REQUEST,
+                    "INVALID_LEAVE_ITEMS",
+                    "items 목록이 필요합니다.",
+                )
+            items = self._leave_items().set(body["items"])
+            self._send_json(request, HTTPStatus.OK, {"ok": True, "items": items})
+            return
+
+        if path.startswith("/api/items/") and path.endswith("/drawer"):
+            item = path[len("/api/items/"):-len("/drawer")]
+            self._validate_item(item)
+            body = self._read_json_object(request)
+            drawer = body.get("drawer_id")
+            if set(body) != {"drawer_id"} or type(drawer) is not int or not 1 <= drawer <= 6:
+                raise ValueError("drawer_id는 1~6이어야 합니다.")
+            with self.drawer_items.lock:
+                self.drawer_items.assign(item, drawer)
+            self._send_json(request, HTTPStatus.OK, {"ok": True})
+            return
+
         if path.startswith("/api/items/") and path.endswith("/aim"):
             item = path[len("/api/items/"):-len("/aim")]
             self._validate_item(item)
             self._read_json_object(request, must_be_empty=True)
             record = self._get_item(item)
-            if record.pos_x is None or record.pos_y is None:
-                raise HttpApiError(
-                    HTTPStatus.CONFLICT,
-                    "NO_POSITION",
-                    "저장된 물건 좌표가 없습니다.",
-                )
+            if record.drawer_id is not None or record.pos_x is None or record.pos_y is None:
+                raise HttpApiError(HTTPStatus.CONFLICT, "NO_POSITION", "레이저로 안내할 카메라 좌표가 없습니다. 서랍 보관 물건은 서랍을 열어 확인해 주세요.")
+            if self.stm32 is None or self.mapper is None:
+                raise HttpApiError(HTTPStatus.SERVICE_UNAVAILABLE, "LASER_UNAVAILABLE", "레이저 연결 또는 좌표 보정을 확인해 주세요.")
             pan, tilt = self.mapper.map(record.pos_x, record.pos_y)
-            self.stm32.point(pan, tilt, on_seconds=self.laser_seconds)
+            with self._aim_lock:
+                self.stm32.point(pan, tilt, on_seconds=self.laser_seconds)
             self._send_json(request, HTTPStatus.OK, {"ok": True})
             return
 
@@ -206,9 +250,9 @@ class RetraceHttpServer:
         if drawer_match is not None:
             self._read_json_object(request, must_be_empty=True)
             drawer = int(drawer_match.group(1))
-            self.storage.send_device_command(
-                self.drawer_target, f"OPEN:{drawer}"
-            )
+            with self.drawer_items.lock:
+                self.storage.send_device_command(self.drawer_target, f"OPEN:{drawer}")
+                self.drawer_items.release(drawer)
             self._send_json(request, HTTPStatus.OK, {"ok": True})
             return
 
@@ -229,17 +273,46 @@ class RetraceHttpServer:
 
         raise HttpApiError(HTTPStatus.NOT_FOUND, "NOT_FOUND", "경로를 찾을 수 없습니다.")
 
+    def _leave_items(self) -> LeaveItems:
+        if self.leave_items is None:
+            raise HttpApiError(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                "LEAVE_ITEMS_UNAVAILABLE",
+                "외출 알림 물건 목록을 사용할 수 없습니다.",
+            )
+        return self.leave_items
+
     def _get_item(self, item: str) -> LastSeenRecord:
+        # Custom drawer items are stored locally, not registered with YOLO's DB.
+        # Read their assignment directly instead of querying a camera-only backend.
+        with self.drawer_items.lock:
+            if item.startswith("custom_") and item in self.drawer_items.entries:
+                return self.drawer_items.apply(self._unseen_item(item))
         try:
-            return self.storage.get_item(item)
+            return self.drawer_items.apply(self.storage.get_item(item))
         except LastSeenError as error:
             if "RT_NOT_FOUND" in str(error):
+                with self.drawer_items.lock:
+                    if item in self.drawer_items.entries:
+                        return self.drawer_items.apply(self._unseen_item(item))
                 raise HttpApiError(
                     HTTPStatus.NOT_FOUND,
                     "ITEM_NOT_FOUND",
                     "등록된 물건을 찾을 수 없습니다.",
                 ) from error
             raise
+
+    @staticmethod
+    def _unseen_item(item: str) -> LastSeenRecord:
+        return LastSeenRecord(item=item, pos_x=None, pos_y=None, seen_at=None,
+                              snapshot=None, drawer_id=None, state="uncertain")
+
+    def _item_json(self, record: LastSeenRecord) -> dict:
+        data = asdict(record)
+        name = self.drawer_items.display_name(record.item)
+        if name is not None:
+            data["display_name"] = name
+        return data
 
     def _send_snapshot(self, request: BaseHTTPRequestHandler, relative: str) -> None:
         if not relative.startswith("snapshots/"):

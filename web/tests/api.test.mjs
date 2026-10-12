@@ -5,6 +5,67 @@ import { createApi, validateItem, ApiError } from '../api.js';
 const record = (item = 'carkey') => ({ item, pos_x: 412, pos_y: 288, seen_at: '2026-10-03T14:22:05+09:00', snapshot: 'snapshots/key.jpg', drawer_id: null, state: 'visible' });
 const reply = (data, status = 200) => ({ ok: status >= 200 && status < 300, status, json: async () => structuredClone(data) });
 const hasCode = code => error => error instanceof ApiError && error.code === code;
+
+test('직접 입력한 물건 이름은 보관·이동·해제 후에도 유지한다', async () => {
+  const api = createApi();
+  const added = await api.createDrawerItem('  여권  ', 3);
+  assert.match(added.item, /^custom_[a-f0-9]{24}$/);
+  let item = await api.getItem(added.item);
+  assert.equal(item.display_name, '여권');
+  assert.equal(item.drawer_id, 3);
+  const same = await api.createDrawerItem('여권', 4);
+  assert.equal(same.item, added.item);
+  assert.equal((await api.listItems()).filter(record => record.display_name === '여권').length, 1);
+  await api.storeDrawer(added.item, 2);
+  assert.equal((await api.getItem(added.item)).display_name, '여권');
+  await api.openDrawer(2);
+  item = await api.getItem(added.item);
+  assert.equal(item.display_name, '여권');
+  assert.equal(item.drawer_id, null);
+  assert.equal(item.pos_x, null);
+});
+
+test('직접 입력한 이름의 요청·응답 및 잘못된 입력 검증', async () => {
+  const result = { ok: true, item: 'custom_1234567890abcdef12345678', display_name: '여권' };
+  const { api, calls } = liveWith(result);
+  assert.deepEqual(await api.createDrawerItem('여권', 1), result);
+  assert.equal(calls[0].url, 'http://jetson.local:8080/api/drawer-items');
+  assert.equal(calls[0].body, '{"name":"여권","drawer_id":1}');
+  for (const name of ['', '  ', null, 'x'.repeat(41), '여\u0000권']) await assert.rejects(api.createDrawerItem(name, 1), hasCode('INVALID_NAME'));
+  for (const n of [0, 7, true, '1']) await assert.rejects(api.createDrawerItem('여권', n), hasCode('INVALID_DRAWER'));
+  assert.equal(calls.length, 1);
+  const invalid = liveWith({ ok: true, item: 'wallet', display_name: '다른 이름' }).api;
+  await assert.rejects(invalid.createDrawerItem('여권', 1), hasCode('BAD_RESPONSE'));
+  assert.deepEqual(validateItem({ ...record(), display_name: '여권' }).display_name, '여권');
+});
+
+test('미목격 물건도 서랍에 등록하고 해당 서랍 열기로 해제한다', async () => {
+  const api = createApi();
+  await api.storeDrawer('umbrella', 1);
+  await api.storeDrawer('backpack', 1);
+  await api.storeDrawer('book', 2);
+  assert.equal((await api.getItem('umbrella')).drawer_id, 1);
+  assert.equal((await api.listItems()).filter(item => item.drawer_id === 1).length, 2);
+  await api.openDrawer(1);
+  for (const item of ['umbrella', 'backpack']) {
+    const released = await api.getItem(item);
+    assert.equal(released.drawer_id, null);
+    assert.equal(released.pos_x, null);
+    assert.equal(released.seen_at, null);
+  }
+  assert.equal((await api.getItem('book')).drawer_id, 2);
+});
+
+test('보관 등록 요청 형식과 잘못된 값 검증', async () => {
+  const { api, calls } = liveWith({ ok: true });
+  await api.storeDrawer('umbrella', 6);
+  assert.equal(calls[0].url, 'http://jetson.local:8080/api/items/umbrella/drawer');
+  assert.equal(calls[0].method, 'POST');
+  assert.equal(calls[0].body, '{"drawer_id":6}');
+  for (const item of ['../umbrella', '', null]) await assert.rejects(api.storeDrawer(item, 1), hasCode('INVALID_ITEM'));
+  for (const n of [0, 7, true, '1']) await assert.rejects(api.storeDrawer('umbrella', n), hasCode('INVALID_DRAWER'));
+  assert.equal(calls.length, 1);
+});
 function liveWith(data, status = 200) {
   const calls = [];
   const api = createApi({ mode: 'live', apiBaseUrl: 'http://jetson.local:8080/', fetchImpl: async (url, options) => {
@@ -18,14 +79,12 @@ test('실제 모드는 문서의 모든 경로·메서드·본문을 사용한�
   const { api, calls } = liveWith(url => url.endsWith('/api/items') ? { items: [record()] } : url.endsWith('/api/items/carkey') ? record() : { ok: true });
   assert.deepEqual(await api.listItems(), [record()]);
   assert.deepEqual(await api.getItem('carkey'), record());
-  await api.aim('carkey');
   await api.openDrawer(6);
   await api.setBuzzer(true);
   await api.setBuzzer(false);
   assert.deepEqual(calls.map(({ url, method, body }) => [url, method, body]), [
     ['http://jetson.local:8080/api/items', 'GET', undefined],
     ['http://jetson.local:8080/api/items/carkey', 'GET', undefined],
-    ['http://jetson.local:8080/api/items/carkey/aim', 'POST', '{}'],
     ['http://jetson.local:8080/api/drawers/6/open', 'POST', '{}'],
     ['http://jetson.local:8080/api/buzzer', 'POST', '{"enabled":true}'],
     ['http://jetson.local:8080/api/buzzer', 'POST', '{"enabled":false}'],
@@ -38,16 +97,14 @@ test('실제 모드는 문서의 모든 경로·메서드·본문을 사용한�
   }
 });
 
-test('서버가 반환한 동적 물건 ID를 조회하고 안내할 수 있다', async () => {
+test('서버가 반환한 동적 물건 ID의 마지막 기록을 조회할 수 있다', async () => {
   const keyboard = record('keyboard');
   const { api, calls } = liveWith(url => url.endsWith('/api/items') ? { items: [keyboard] } : url.endsWith('/api/items/keyboard') ? keyboard : { ok: true });
   assert.deepEqual(await api.listItems(), [keyboard]);
   assert.deepEqual(await api.getItem('keyboard'), keyboard);
-  await api.aim('keyboard');
   assert.deepEqual(calls.map(call => call.url), [
     'http://jetson.local:8080/api/items',
     'http://jetson.local:8080/api/items/keyboard',
-    'http://jetson.local:8080/api/items/keyboard/aim',
   ]);
 });
 
@@ -58,7 +115,7 @@ test('샘플 모드는 모든 조회·제어에서 네트워크를 사용하지 
   assert.deepEqual(items.map(item => item.item), ['carkey', 'airpods', 'wallet']);
   items[0].pos_x = 999;
   assert.equal((await api.getItem('carkey')).pos_x, 412);
-  for (const item of items) await api.aim(item.item);
+  for (const item of items) assert.deepEqual(await api.aim(item.item), { ok: true });
   for (let n = 1; n <= 6; n++) await api.openDrawer(n);
   await api.setBuzzer(true);
   await api.setBuzzer(false);
@@ -74,6 +131,15 @@ test('잘못된 물건·서랍·부저 값은 요청 전에 거절한다', async
   for (const value of [0, 7, -1, 1.5, '1', null]) await assert.rejects(api.openDrawer(value), hasCode('INVALID_DRAWER'));
   for (const value of [0, 1, '0', '1', null]) await assert.rejects(api.setBuzzer(value), hasCode('INVALID_BUZZER'));
   assert.equal(calls.length, 0);
+});
+
+test('레이저 안내는 선택한 물건의 aim 경로로 요청한다', async () => {
+  const { api, calls } = liveWith({ ok: true });
+  assert.deepEqual(await api.aim('carkey'), { ok: true });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/api\/items\/carkey\/aim$/);
+  assert.equal(calls[0].method, 'POST');
+  assert.deepEqual(JSON.parse(calls[0].body), {});
 });
 
 test('기록 없음·서랍 기록·UTC 시각·사진 없는 기록을 허용한다', () => {
@@ -116,7 +182,6 @@ test('목록의 잘못된 구조·중복 ID와 다른 물건 상세를 거절한
 test('ok: true 접수 응답만 성공으로 처리한다', async () => {
   for (const data of [{ ok: false }, { ok: 'true' }, {}, null]) {
     const { api } = liveWith(data);
-    await assert.rejects(api.aim('carkey'), hasCode('BAD_RESPONSE'));
     await assert.rejects(api.openDrawer(1), hasCode('BAD_RESPONSE'));
     await assert.rejects(api.setBuzzer(false), hasCode('BAD_RESPONSE'));
   }
@@ -161,4 +226,25 @@ test('모드·서버 주소·제한 시간 설정 오류를 알린다', () => {
   for (const options of [{ mode: 'mock' }, { apiBaseUrl: 'ftp://jetson' }, { timeoutMs: 0 }, { timeoutMs: Infinity }]) {
     assert.throws(() => createApi(options), hasCode('INVALID_CONFIG'));
   }
+});
+
+test('외출 알림 물건 목록을 조회하고 저장한다', async () => {
+  const { api, calls } = liveWith(url => url.endsWith('/api/leave-items') ? { ok: true, items: ['carkey', 'wallet'] } : {});
+  assert.deepEqual(await api.getLeaveItems(), ['carkey', 'wallet']);
+  assert.deepEqual(await api.setLeaveItems(['carkey', 'wallet']), ['carkey', 'wallet']);
+  assert.deepEqual(calls.map(({ url, method, body }) => [url, method, body]), [
+    ['http://jetson.local:8080/api/leave-items', 'GET', undefined],
+    ['http://jetson.local:8080/api/leave-items', 'POST', '{"items":["carkey","wallet"]}'],
+  ]);
+  await assert.rejects(api.setLeaveItems(['Bad ID']), hasCode('INVALID_ITEM'));
+  await assert.rejects(api.setLeaveItems('carkey'), hasCode('INVALID_LEAVE_ITEMS'));
+  const broken = liveWith({ items: ['Bad ID'] }).api;
+  await assert.rejects(broken.getLeaveItems(), hasCode('BAD_RESPONSE'));
+});
+
+test('샘플 모드는 외출 알림 등록을 네트워크 없이 기억한다', async () => {
+  const api = createApi({ fetchImpl: async () => { throw new Error('network forbidden'); } });
+  assert.deepEqual(await api.getLeaveItems(), ['carkey']);
+  assert.deepEqual(await api.setLeaveItems(['carkey', 'wallet']), ['carkey', 'wallet']);
+  assert.deepEqual(await api.getLeaveItems(), ['carkey', 'wallet']);
 });

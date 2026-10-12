@@ -19,6 +19,13 @@ function validItemId(item) {
   return item;
 }
 
+function validCustomName(name) {
+  if (typeof name !== 'string') throw new ApiError('INVALID_NAME', '물건 이름을 입력해 주세요.');
+  const cleaned = name.trim();
+  if (!cleaned || [...cleaned].length > 40 || /[\u0000-\u001f\u007f-\u009f]/.test(cleaned)) throw new ApiError('INVALID_NAME', '물건 이름은 제어 문자를 제외한 1~40자로 입력해 주세요.');
+  return cleaned;
+}
+
 function snapshotPath(path) {
   if (typeof path !== 'string' || !path.startsWith('snapshots/')) return false;
   const parts = path.split('/');
@@ -36,7 +43,15 @@ export function validateItem(record) {
   if (record.drawer_id !== null && (!Number.isInteger(record.drawer_id) || record.drawer_id < 1 || record.drawer_id > 6)) bad();
   if (!states.includes(record.state)) bad();
   if (record.seen_at === null && (!xyEmpty || record.snapshot !== null || record.drawer_id !== null)) bad();
-  return { item: record.item, pos_x: record.pos_x, pos_y: record.pos_y, seen_at: record.seen_at, snapshot: record.snapshot, drawer_id: record.drawer_id, state: record.state };
+  if (record.display_name !== undefined && (typeof record.display_name !== 'string' || !record.display_name.trim() || [...record.display_name].length > 40 || /[\u0000-\u001f\u007f-\u009f]/.test(record.display_name))) bad();
+  return { item: record.item, pos_x: record.pos_x, pos_y: record.pos_y, seen_at: record.seen_at, snapshot: record.snapshot, drawer_id: record.drawer_id, state: record.state, ...(record.display_name === undefined ? {} : { display_name: record.display_name }) };
+}
+
+function leaveItemList(data) {
+  if (!Array.isArray(data?.items) || !data.items.every(item => typeof item === 'string' && itemIdPattern.test(item))) {
+    throw new ApiError('BAD_RESPONSE', '서버의 외출 알림 목록 형식이 프로토콜과 다릅니다.');
+  }
+  return [...data.items];
 }
 
 function acknowledged(result) {
@@ -94,6 +109,18 @@ export function createApi({ mode = 'demo', apiBaseUrl = '', timeoutMs = 8000, fe
       validItemId(item);
       return acknowledged(mode === 'demo' ? await demo.aim(item) : await request(`/api/items/${encodeURIComponent(item)}/aim`, { method: 'POST', body: {} }));
     },
+    async createDrawerItem(name, n) {
+      name = validCustomName(name);
+      if (!Number.isInteger(n) || n < 1 || n > 6) throw new ApiError('INVALID_DRAWER', '서랍 번호는 1~6이어야 합니다.');
+      const result = acknowledged(mode === 'demo' ? await demo.createDrawerItem(name, n) : await request('/api/drawer-items', { method: 'POST', body: { name, drawer_id: n } }));
+      if (typeof result.item !== 'string' || !/^custom_[a-f0-9]{24}$/.test(result.item) || result.display_name !== name) throw new ApiError('BAD_RESPONSE', '추가한 물건의 응답을 확인할 수 없습니다.');
+      return result;
+    },
+    async storeDrawer(item, n) {
+      validItemId(item);
+      if (!Number.isInteger(n) || n < 1 || n > 6) throw new ApiError('INVALID_DRAWER', '서랍 번호는 1~6이어야 합니다.');
+      return acknowledged(mode === 'demo' ? await demo.storeDrawer(item, n) : await request(`/api/items/${encodeURIComponent(item)}/drawer`, { method: 'POST', body: { drawer_id: n } }));
+    },
     async openDrawer(n) {
       if (!Number.isInteger(n) || n < 1 || n > 6) throw new ApiError('INVALID_DRAWER', '서랍 번호는 1~6이어야 합니다.');
       return acknowledged(mode === 'demo' ? await demo.openDrawer(n) : await request(`/api/drawers/${n}/open`, { method: 'POST', body: {} }));
@@ -101,6 +128,14 @@ export function createApi({ mode = 'demo', apiBaseUrl = '', timeoutMs = 8000, fe
     async setBuzzer(enabled) {
       if (typeof enabled !== 'boolean') throw new ApiError('INVALID_BUZZER', '부저 요청은 켜기 또는 끄기로 정해야 합니다.');
       return acknowledged(mode === 'demo' ? await demo.setBuzzer(enabled) : await request('/api/buzzer', { method: 'POST', body: { enabled } }));
+    },
+    async getLeaveItems() {
+      return leaveItemList(mode === 'demo' ? await demo.getLeaveItems() : await request('/api/leave-items'));
+    },
+    async setLeaveItems(items) {
+      if (!Array.isArray(items) || items.length > 20) throw new ApiError('INVALID_LEAVE_ITEMS', '외출 알림 물건은 20개까지 등록할 수 있어요.');
+      items.forEach(validItemId);
+      return leaveItemList(acknowledged(mode === 'demo' ? await demo.setLeaveItems(items) : await request('/api/leave-items', { method: 'POST', body: { items } })));
     },
     snapshotUrl(record) {
       if (record.snapshot === null) return null;

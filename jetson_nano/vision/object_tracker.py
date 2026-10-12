@@ -23,7 +23,7 @@ class StableObjectTracker:
         confidence: float = 0.60,
         stable_frames: int = 3,
         stability_radius: float = 30.0,
-        movement_threshold: float = 50.0,
+        movement_threshold: float = 10.0,
         retry_seconds: float = 5.0,
     ) -> None:
         self.confidence = confidence
