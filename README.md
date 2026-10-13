@@ -1,250 +1,120 @@
 # Retrace
 
-> 스마트 공간 블랙박스 기반 분실물 위치 기억 및 탐색 시스템
+> 카메라가 물건의 마지막 모습을 기억하고, 다시 찾거나 외출 전에 챙길 수 있도록 돕는 스마트 공간 블랙박스
 
-Retrace는 카메라를 이용해 공간 속 물건을 지속적으로 관찰하고,  
-물건이 마지막으로 확인된 **위치·시간·이미지**를 기록하여 분실 시 빠르게 찾을 수 있도록 돕는 IoT 시스템입니다.
+Retrace는 물건을 어디에 뒀는지 잊어버리는 일상의 불편을 줄이기 위한 IoT 시스템입니다. 카메라가 인식한 물건의 **마지막 목격 사진·시각·화면 좌표(Last Seen)**를 기록하고, 웹·레이저·스마트 서랍·LCD·휴대폰 알림으로 확인과 탐색을 돕습니다.
 
-단순히 현재 물건을 탐지하는 것이 아니라, 물건이 시야에서 사라지더라도  
-**마지막 목격 정보(Last Seen)** 를 기억하고 복원하는 것을 핵심 목표로 합니다.
+기록은 마지막으로 관찰했을 때의 정보입니다. 물건이 이동하거나 카메라 밖에 있으면 현재 위치와 다를 수 있으며, 동일 종류의 물건은 클래스별 최신 기록으로 관리합니다.
 
-**허브(Jetson Nano) + 노드** 구조로, 카메라 기반 비주얼 메모리를 중심으로  
-**레이저 안내**, **스마트 서랍**, **스마트 현관등**, **Web/PWA**를 연동합니다.
+## 시스템 구성
 
----
-
-시스템 구성
-
-| 노드 | 장치 | 역할 |
-|---|---|---|
-| **메인 유닛 (허브)** | Jetson Nano + 카메라 + STM32 | AI 객체 탐지, Last Seen, DB/이미지 저장, Web/TCP 서버, 레이저 안내, PIR |
-| **서랍 노드** | STM32 NUCLEO-F411RE + HC-06 | 서랍 LED ×6, 서랍 팝업 서보 ×6, 비상 버튼 |
-| **출입 노드 (스마트 현관등)** | LOLIN D32 (ESP32) + PIR + LED | 외출 감지, 현관등 점등·경고 |
-| **사용자 화면** | Web / PWA | 검색 및 시스템 제어 UI |
-
----
-
-## 사용 기술
-
-- Jetson Nano / Linux
-- C / C++
-- YOLO / OpenCV
-- STM32 NUCLEO-F411RE ×2 (STM32CubeMX / CMake)
-- ESP32 (LOLIN D32) / PlatformIO
-- Wi-Fi / TCP
-- ntfy (폰 푸시 알림)
-- Bluetooth (HC-06)
-- GitHub / Jira
-
----
+| 구성 | 장치 | 역할 | 연결 |
+|---|---|---|---|
+| 허브 | Jetson Nano + USB 웹캠 | YOLO 인식, Last Seen, JPEG·MariaDB 저장, HTTP API·C TCP 서버 | USB / LAN |
+| 레이저 안내 유닛 | STM32 NUCLEO-F411RE #1 + 서보 2개 + 레이저 + PIR① | 움직임 이벤트 전달, 각도 명령에 따른 레이저 안내 | USB Serial, 115200 |
+| 스마트 서랍 | STM32 NUCLEO-F411RE #2 + HC-06 + PCA9685 | 서랍 6개 팝업·LED, SOS 버튼 | Bluetooth Classic / RFCOMM, UART 9600 |
+| 현관 센서등 | LOLIN D32 + PIR② + LED | 자체 센서등, 현관 움직임 이벤트, 경고 점멸 | Wi-Fi TCP |
+| 정보 표시 LCD | ESP32-C3 Super Mini + I2C 1602 LCD | 최근 목격 정보, 외출 준비물, 시각·날씨 표시 | Wi-Fi HTTP / I2C |
+| 사용자 화면 | PC·휴대폰 웹 브라우저 | 물건 조회·사진 확대, 레이저·서랍 요청, 준비물 등록 | HTTP |
+| 휴대폰 알림 | ntfy 서버·휴대폰 앱 | 외출 확인 및 SOS 알림 전달 | HTTP / 알림 채널 구독 |
 
 ## 시스템 구조
 
-```text
-┌────────────── Main Unit (Hub) ──────────────┐
-│                                             │
-│  [ USB Camera ]                             │
-│        │ USB                                │
-│        v                                    │
-│  [ Jetson Nano ]   Vision / Last Seen / DB  │
-│        │           Web API / TCP Server     │
-│        │ USB Serial                         │
-│        v                                    │
-│  [ STM32 Main Unit ]                        │
-│     Pan/Tilt / Laser / PIR                  │
-│                                             │
-└───────────┬──────────────┬──────────────┘
-            │              │
-       Bluetooth         Wi-Fi
-        (HC-06)       (TCP / HTTP)
-            │              │
-      ┌─────┴─────┐  ┌─────┴─────┐  ┌───────────┐
-      │  Drawer   │  │ Entrance  │  │  Web/PWA  │
-      │   Node    │  │   Node    │  │ Phone / PC│
-      │ STM32 #2  │  │ LOLIN D32 │  │           │
-      │ LED x6    │  │ PIR / LED │  │           │
-      │ Servo x6  │  │           │  │           │
-      └───────────┘  └───────────┘  └───────────┘
+```mermaid
+flowchart LR
+    CAM[USB 웹캠] --> CV[OpenCV 프레임 수집]
+    CV --> YOLO[YOLO 물건 탐지]
+    subgraph HUB[Jetson Nano]
+        CV
+        YOLO --> PY[Python Application]
+        PY --> PHOTO[JPEG 사진]
+        PY <--> TCP[C TCP Server]
+        TCP <--> DB[(MariaDB)]
+        PY --> NTFY[ntfy 서버]
+    end
+    WEB[웹 브라우저] <-->|HTTP 조회·제어| PY
+    LCD[ESP32-C3 · LCD] <-->|HTTP 조회| PY
+    PY -->|USB 제어 명령| MAIN[STM32 레이저 유닛]
+    MAIN -.->|PIR① 이벤트| PY
+    TCP <-->|RFCOMM 중계 · HC-06| DRAWER[STM32 스마트 서랍 · SOS]
+    TCP <-->|Wi-Fi TCP| ENTRANCE[LOLIN D32 현관 센서등 · PIR②]
+    NTFY --> PHONE[휴대폰 ntfy 앱]
 ```
 
-| 노드 | 설명 |
-|---|---|
-| Main Unit (Hub) | Jetson Nano + 카메라 + STM32 #1 메인 유닛 제어 보드를 한 몸체로 구성 |
-| Drawer Node | 스마트 서랍 + 비상 폰 찾기(사이렌) 버튼 (STM32 #2 + HC-06) |
-| Entrance Node | 스마트 현관등 (LOLIN D32 + PIR + LED) |
-| Web/PWA | 사용자 화면 (스마트폰 / PC), 폰 사이렌은 ntfy 앱으로 수신 |
+Python 애플리케이션은 Jetson에서 실행되며 인식·기록·좌표 변환·HTTP 요청·외출 재확인을 담당합니다. C TCP 서버는 DB 요청과 서랍·현관 노드의 메시지를 중계합니다. 레이저 제어는 Python에서 STM32로 직접 전달합니다. LCD는 정보를 조회하고 표시하며 장치를 제어하지 않습니다.
 
-Jetson Nano가 허브로서 판단·기록·서비스를 담당하고,  
-각 노드는 맡은 센서 및 구동 장치를 제어하며 허브와 통신합니다.
+## 핵심 동작
 
----
+### 물건 관찰·기록
 
-## 통신 구조
+PIR①의 움직임 이벤트를 받으면 카메라 영상에서 물건 탐지를 시작합니다. 안정적으로 인식되고 저장 조건을 충족한 물건의 사진과 정보를 갱신합니다. 사진은 JPEG 파일, 종류·좌표·시각·사진 경로는 MariaDB에 저장합니다. 새 관측이 없거나 저장하지 못하면 기존 기록을 유지합니다.
 
-설치 위치와 용도에 따라 통신 방식을 나눴습니다.
+모델은 COCO 기본 80개 클래스와 추가 학습한 `car_key`·`wallet`·`earphones`를 함께 인식합니다. 사람(`person`)은 탐지할 수 있지만 물건 Last Seen 저장 대상에서는 제외합니다. 세부 조건은 [추론·기록 정책](docs/inference_policy.md)을 참고합니다.
 
-| 연결 | 방식 | 선택 이유 |
-|---|---|---|
-| Jetson ↔ 카메라 | USB | 메인 유닛 내부 |
-| Jetson ↔ STM32 | USB Serial (ST-LINK VCP) | 메인 유닛 내부, 카메라·레이저 위치 고정 |
-| Jetson ↔ 서랍 노드 | **Bluetooth** (HC-06) | 같은 방 안 가구 — 근거리, 공유기 불필요 |
-| Jetson ↔ 출입 노드 | **Wi-Fi** (인증 TCP client) | 다른 공간(현관) — 공유기 경유 |
-| Jetson ↔ Web / PWA | **Wi-Fi** (HTTP) | 사용자 화면 |
-| Jetson → 스마트폰 알림 | **Wi-Fi** (ntfy) | 화면이 꺼진 폰도 받아야 하는 알림 (폰 사이렌, 외출 알림) |
+### 물건 찾기·안내
 
-> **같은 방 = Bluetooth / 다른 공간 = Wi-Fi**
+웹에서 물건을 선택하면 마지막 사진과 시각을 확인할 수 있습니다. 레이저 안내 요청 시 저장된 화면 좌표를 보정된 서보 각도로 변환해 USB로 STM32에 전달합니다. 카메라와 레이저의 설치 위치·관측 평면이 바뀌면 보정도 다시 해야 합니다.
 
-Jetson의 Bluetooth는 USB Bluetooth 4.0 동글(CSR8510)을 사용합니다.
+스마트 서랍은 웹에서 물건을 서랍에 등록하고 해당 서랍 열기를 요청하는 방식입니다. PCA9685로 해당 서보를 구동하고 LED로 번호를 표시합니다. 복귀는 서보 팔의 복귀이며 서랍 자동 닫힘은 아닙니다. LED는 닫힘 센서 없이 10초 타이머로 소등합니다. 수동 서랍 등록 정보는 카메라 기록과 별도로 관리합니다.
 
-### 현관 TCP client
+### 현관 외출 확인·휴대폰 찾기
 
-출입 노드는 Wi-Fi로 Jetson TCP 서버(기본 5000번)에 직접 접속합니다. `[ID:비밀번호]`로 로그인한 뒤 PIR 감지 시 `[SERVER]EVT@ENTRANCE:PIRON`을 전송하고, 서버에서 받은 `PING`, `NORMAL`, `ALERT`에 응답합니다. 상세 형식은 [통신 프로토콜](docs/protocol.md)을 참고합니다.
+PIR②가 움직임을 감지하면, 웹에서 등록한 준비물이 **현재 카메라 영상에 남아 있는지 약 3초간 재확인**합니다. 반복해서 확인된 물건이 있으면 이름을 넣은 준비물 알림과 현관등 경고 명령을 보냅니다. 책상 카메라가 현관을 관찰하는 구조는 아닙니다.
 
----
+서랍의 SOS 버튼은 별도의 휴대폰 찾기 알림을 전송합니다. 메시지는 Jetson의 ntfy 서버를 거쳐 휴대폰 ntfy 앱으로 전달하며, 알림음 반복·음성 안내는 휴대폰 앱과 자동화 설정에 따릅니다.
 
-## 데이터 흐름
+### LCD 정보 표시
 
-### 물건 감지
+ESP32-C3는 Wi-Fi로 Jetson의 HTTP API를 읽고 I2C 1602 LCD에 표시합니다.
 
-```text
-Camera
-   ↓
-Jetson Nano (YOLO / OpenCV)
-   ↓
-객체 탐지
-   ↓
-Last Seen 갱신
-   ↓
-DB + 스냅샷 저장
-```
+- 마지막 목격 정보: **10초마다 조회**, 사진·시각이 있는 최근 물건 최대 3개 표시.
+- 외출 준비물: 웹에서 저장한 같은 목록을 **15초마다 조회**. 기본 오전 07:00~08:00에 표시.
+- 화면 전환: 기본 **5초마다 순환**. 새 목격 기록은 5초간 우선 표시.
+- 시각·날씨: 한국 시간과 Open-Meteo 예보 표시, 날씨는 10분마다 조회.
+- 통신 실패: 이전 값을 유지하되 캐시·오프라인 상태 표시. 일반 1602 LCD에는 영문 이름 사용.
 
-### 레이저 위치 안내
+조회 주기는 DB에 기록하는 주기와 다릅니다. 핀·설정은 [LCD 안내](esp32/preparation_display/README.md)와 [핀맵](docs/pinmap.md)을 참고합니다.
 
-```text
-Web / PWA
-   ↓ HTTP
-Jetson Nano
-   ↓ USB Serial
-STM32
-   ↓
-Pan/Tilt 이동 → Laser ON
-```
+## 사용 기술
 
-### 스마트 서랍
-
-```text
-Web / PWA
-   ↓ HTTP
-Jetson Nano
-   ↓ Bluetooth
-STM32 #2 (서랍)
-   ↓
-해당 서랍 LED ON → Drawer Servo 동작
-   ↓
-일정 시간 후 LED 자동 OFF
-```
-
-### PIR 활동 감지
-
-```text
-PIR
- ↓
-STM32
- ↓ USB Serial
-Jetson Nano
- ↓
-분석 활성 / 대기 판단
-```
-
-### 비상 버튼
-
-```text
-Emergency Button
-   ↓
-STM32 #2 (서랍)
-   ↓ Bluetooth
-Jetson Nano (ntfy 서버)
-   ↓ Wi-Fi
-스마트폰 ntfy 앱
-   ↓
-폰 사이렌 (알림음 반복)
-```
-
-### 외출 알림 (스마트 현관등, 연동 계획)
-
-```text
-출입 노드 PIR 감지
-   ↓ Wi-Fi TCP (`EVT@ENTRANCE:PIRON`)
-Jetson Nano
-   ↓
-등록한 외출 물건의 Last Seen 확인
-   ├─ TCP (`ALERT`) → 현관등 경고 점등
-   └─ ntfy → 폰의 ntfy 앱에 준비물 알림
-                 ↓
-          Tasker: ntfy 앱 + Car Key Check 제목인 알림만 선택
-                 ↓
-          폰 TTS → "차키 챙기셨나요?" 음성 안내
-```
+- Jetson Nano / Linux, Python, Ultralytics YOLO, OpenCV
+- C TCP 서버, MariaDB Connector/C, libjpeg
+- STM32 NUCLEO-F411RE ×2, STM32CubeMX / HAL / CMake
+- LOLIN D32·ESP32-C3 Super Mini, Arduino / PlatformIO
+- USB Serial, Bluetooth Classic / RFCOMM, Wi-Fi TCP / HTTP, I2C
+- HTML / CSS / JavaScript, ntfy, Open-Meteo
 
 ## 프로젝트 구조
 
 ```text
 Retrace-Project/
-├─ stm32/                              # STM32 프로젝트 (CubeMX + CMake)
-│  ├─ main_unit/                       # STM32 #1 메인 유닛 (Jetson ↔ USB Serial)
-│  │  ├─ Retrace_STM32.ioc             # CubeMX 핀·주변장치 설정
-│  │  └─ Core/Src/
-│  │     ├─ main.c                     # 초기화 · 메인 루프
-│  │     ├─ serial_cmd.c               # UART 인터럽트 수신 · 응답
-│  │     ├─ cmd_parser.c               # 명령 해석 (PING · AIM · LASER · HOME)
-│  │     ├─ pan_tilt.c                 # Pan/Tilt 서보 PWM
-│  │     ├─ laser.c                    # 레이저 ON/OFF
-│  │     └─ pir_sensor.c               # PIR 감지 → EVT@PIR
-│  └─ drawer/                          # STM32 #2 서랍 (Jetson ↔ HC-06)
-│     ├─ drawer.ioc                    # CubeMX 핀·주변장치 설정
-│     └─ Core/Src/
-│        ├─ main.c                     # 초기화 · 메인 루프
-│        ├─ serial_cmd.c               # HC-06 · USB 수신 · 응답
-│        ├─ cmd_parser.c               # 명령 해석 (PING · DRAWER · LED)
-│        ├─ drawer.c                   # 서랍 LED ×6 · 팝업 서보 ×6 · 소등 타이머
-│        └─ emergency_button.c         # 비상 버튼 → EVT:BTN:SOS
-│
-├─ esp32/                              # ESP32 프로젝트 (PlatformIO · Arduino)
-│  ├─ entrance_node/                   # ESP32 #1 현관등 (Jetson ↔ Wi-Fi · TCP)
-│  │  ├─ platformio.ini                # 보드 · 빌드 설정
-│  │  ├─ src/main.cpp                  # PIR · LED · Wi-Fi · TCP client
-│  │  └─ include/
-│  │     ├─ entrance_control.h         # PIR 필터 · 센서등 · 경고 타이머
-│  │     └─ network_config.example.h   # Wi-Fi · Jetson 주소 설정 예제
-│
-├─ jetson_nano/                        # 허브 (Python 애플리케이션 + C 서버)
-│  ├─ main.py                          # PIR 기반 카메라 추론 진입점
-│  ├─ vision/                          # 객체 탐지 · 영상 처리
-│  ├─ record/                          # Last Seen 생성 · 관리
-│  ├─ communication/                   # STM32 및 장치 연결
-│  └─ server_jetson/                   # TCP 서버 · DB · 스냅샷 저장
-│
-├─ web/                                # 사용자 화면 (Web / PWA)
-│  ├─ index.html                       # 물건 찾기 · 서랍 화면
-│  ├─ styles.css                       # PC · 휴대폰 레이아웃
-│  ├─ app.js                           # 검색 · 선택 · 요청 · 오류 표시
-│  ├─ api.js                           # HTTP API 요청 · 응답 검사
-│  ├─ config.js                        # 샘플/실제 모드 · 서버 주소
-│  ├─ demo-data.js                     # 샘플 기록
-│  ├─ assets/                          # 화면 이미지 (샘플 장면)
-│  ├─ dev-server.mjs                   # 로컬 미리보기 서버
-│  └─ README.md                        # 실행 · Jetson 연결 방법
-│
-├─ docs/
-│  ├─ protocol.md                      # 보드 간 통신 프로토콜
-│  ├─ pinmap.md                        # 보드별 핀 배정
-│  └─ classroom_test_checklist.md      # 강의실 테스트 체크리스트
-├─ CONTRIBUTING.md                     # 협업 규칙
-└─ README.md
+├─ stm32/
+│  ├─ main_unit/                # 레이저·Pan/Tilt·PIR①
+│  └─ drawer/                   # PCA9685·서랍 LED·SOS
+├─ esp32/
+│  ├─ entrance_node/            # PIR②·센서등·Wi-Fi TCP
+│  └─ preparation_display/      # ESP32-C3·LCD·Wi-Fi HTTP
+├─ jetson_nano/
+│  ├─ main.py                   # Python 애플리케이션 진입점
+│  ├─ vision/                   # 탐지·안정화·좌표 변환·HTTP·외출 재확인
+│  ├─ record/                   # Last Seen·외출 목록·수동 서랍 등록
+│  ├─ communication/            # USB·TCP 이벤트·ntfy
+│  ├─ client/                   # TCP ↔ HC-06 RFCOMM 중계
+│  ├─ server_jetson/            # C TCP 서버·MariaDB·JPEG 검증
+│  ├─ calibration/             # 설치 환경의 레이저 보정 파일
+│  └─ models/yolo/              # 83개 클래스 모델
+├─ web/                         # 조회·제어·준비물 등록 화면
+└─ docs/                        # 핀맵·프로토콜·환경·검증 문서
 ```
 
-## 개발 문서
+## 문서
 
-- [핀맵](docs/pinmap.md) — STM32 ×2, ESP32 ×2
-- [통신 프로토콜](docs/protocol.md)
-- [협업 규칙](CONTRIBUTING.md) — feature 단독 검증 후 develop 통합
+- [보드 핀맵·구동 값](docs/pinmap.md)
+- [통신 프로토콜·HTTP API](docs/protocol.md)
+- [추론·기록·외출 재확인 정책](docs/inference_policy.md)
+- [개발 환경과 버전](docs/environment.md)
+- [장치·전체 연동 체크리스트](docs/classroom_test_checklist.md)
+- [Jetson 서버·DB 실행](jetson_nano/server_jetson/README.md)
+- [웹 실행·연동](web/README.md)
+- [LCD 배선·표시·설정](esp32/preparation_display/README.md)
+- [협업·Git 규칙](CONTRIBUTING.md)

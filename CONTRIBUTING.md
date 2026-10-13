@@ -10,8 +10,8 @@ Retrace 팀이 같은 저장소에서 작업할 때 지키는 규칙입니다.
 |---|---|---|
 | STM32 ×2 · ESP32 ×2 펌웨어 | `stm32/`, `esp32/` | `feature/stm32`, `feature/esp32` |
 | Jetson Nano 서버·인식·DB | `jetson_nano/` | `feature/jetson` |
-| 웹 화면·HTTP API 연결 틀 | `web/` | `feature/web` |
-| 공통 문서 | `docs/`, `README.md` | 관련 작업 브랜치에 같이 포함 |
+| 웹 조회·제어·준비물·수동 서랍 등록 화면 | `web/` | `feature/web` |
+| 공통 문서 | `docs/`, `README.md`, 각 모듈 README | 관련 작업 브랜치에 같이 포함 |
 
 ---
 
@@ -24,7 +24,7 @@ Retrace 팀이 같은 저장소에서 작업할 때 지키는 규칙입니다.
 | `feature/stm32` | STM32 작업 |
 | `feature/esp32` | ESP32 작업 |
 | `feature/jetson` | Jetson 작업 |
-| `feature/web` | 웹 화면 작업, 프로토콜 JSON 합의 후 Jetson 연결 |
+| `feature/web` | 웹 화면·구현된 HTTP API 연동 작업 |
 
 ```text
 feature/stm32  ─┐
@@ -73,14 +73,14 @@ GitHub에서 `feature/*` → `develop` PR 생성 → 변경 확인 → merge합�
 
 테스트 결과와 보정값은 [통합 체크리스트](docs/classroom_test_checklist.md)에 기록합니다.
 
-웹은 `feature/web`에서 작업하며, 실행 방법은 [웹 인계 문서](web/README.md)를 따릅니다.
+웹은 `feature/web`에서 작업하며, 실행 방법은 [웹 실행 문서](web/README.md)를 따릅니다.
 
 ---
 
 ## 4. `main` 반영
 
 `develop`에서 통합 테스트 후 이상이 없으면, GitHub에서 **`develop` → `main` PR**을 만들어 반영합니다.
-`main`은 보호 브랜치라 직접 push할 수 없고, 승인 후 merge합니다.
+`main`은 보호 브랜치이며 기본적으로 PR과 승인 후 반영합니다. 관리자 계정의 우회 권한 유무와 별개로 명시적인 사용자 승인 없이 직접 push하거나 이력을 바꾸지 않습니다.
 
 ---
 
@@ -116,3 +116,9 @@ GitHub에서 `feature/*` → `develop` PR 생성 → 변경 확인 → merge합�
 | [docs/pinmap.md](docs/pinmap.md) | 보드별 핀 배정 · 설정 | 핀을 바꾸면 같은 커밋에 문서도 수정 |
 | [README.md](README.md) | 프로젝트 소개 · 구조 | 폴더 구조가 바뀌면 같이 수정 |
 | [docs/classroom_test_checklist.md](docs/classroom_test_checklist.md) | 보드 단독·전체 연동 테스트 | 실제 실행한 항목만 체크하고 실측값 기록 |
+
+문서는 현재 구현과 실제 검증 기록을 구분합니다. 동작 설명은 소스·설정과 대조하고, 실행하지 않은 테스트를 통과로 표시하지 않습니다. 문서 변경만으로 하드웨어 핀·기본값·개인 설정을 바꾸지 않습니다.
+
+현재 ESP32 두 대는 현관 LOLIN D32와 LCD ESP32-C3입니다. LCD 상세 문서는 [preparation_display/README.md](esp32/preparation_display/README.md), 추론·기록 조건은 [inference_policy.md](docs/inference_policy.md), 도구·패키지는 [environment.md](docs/environment.md)를 함께 갱신합니다.
+
+`AGENTS.md`·`CLAUDE.md`는 현재 저장소에서 로컬 제외 설정으로 관리하는 에이전트 지침입니다. GitHub 공개 문서에 포함하려면 별도로 합의하며, 운영 규칙을 기술 정보 정리와 함께 임의로 변경하지 않습니다.
