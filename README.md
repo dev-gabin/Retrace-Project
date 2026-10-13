@@ -21,24 +21,50 @@ Retrace는 물건을 어디에 뒀는지 잊어버리는 일상의 불편을 줄
 ## 시스템 구조
 
 ```mermaid
-flowchart LR
-    CAM[USB 웹캠] --> CV[OpenCV 프레임 수집]
-    CV --> YOLO[YOLO 물건 탐지]
-    subgraph HUB[Jetson Nano]
-        CV
-        YOLO --> PY[Python Application]
-        PY --> PHOTO[JPEG 사진]
-        PY <--> TCP[C TCP Server]
-        TCP <--> DB[(MariaDB)]
-        PY --> NTFY[ntfy 서버]
+flowchart TB
+    %% User-facing endpoints
+    subgraph USERS["사용자 인터페이스"]
+        direction LR
+        WEB["PC · 휴대폰 웹 브라우저"]
+        LCD["ESP32-C3 · I2C LCD"]
+        PHONE["휴대폰 ntfy 앱"]
     end
-    WEB[웹 브라우저] <-->|HTTP 조회·제어| PY
-    LCD[ESP32-C3 · LCD] <-->|HTTP 조회| PY
-    PY -->|USB 제어 명령| MAIN[STM32 레이저 유닛]
-    MAIN -.->|PIR① 이벤트| PY
-    TCP <-->|RFCOMM 중계 · HC-06| DRAWER[STM32 스마트 서랍 · SOS]
-    TCP <-->|Wi-Fi TCP| ENTRANCE[LOLIN D32 현관 센서등 · PIR②]
-    NTFY --> PHONE[휴대폰 ntfy 앱]
+
+    CAM["USB 웹캠"]
+
+    subgraph HUB["Jetson Nano · 중앙 허브"]
+        direction TB
+        CV["OpenCV · 프레임 수집"] --> YOLO["YOLO · 물건 탐지"] --> PY["Python Application<br/>Last Seen · 좌표 변환 · 외출 재확인 · HTTP API"]
+        PY --> PHOTO["JPEG 사진 저장"]
+        PY <--> TCP["C TCP Server"]
+        TCP <--> DB[("MariaDB")]
+        PY --> NTFY["ntfy 서버"]
+    end
+
+    subgraph DEVICES["하드웨어 제어 · 현관 노드"]
+        direction LR
+        MAIN["STM32 #1 · 레이저 · PIR①"]
+        DRAWER["STM32 #2 · 스마트 서랍 · SOS<br/>HC-06 · PCA9685"]
+        ENTRANCE["LOLIN D32 · 현관 센서등 · PIR②"]
+    end
+
+    CAM -->|"USB 영상"| CV
+    WEB <-->|"HTTP 조회 · 제어"| PY
+    LCD <-->|"Wi-Fi HTTP 조회"| PY
+    NTFY -->|"알림 채널"| PHONE
+    PY -->|"USB Serial · 115200 제어"| MAIN
+    MAIN -.->|"PIR① 이벤트"| PY
+    TCP <-->|"RFCOMM · HC-06"| DRAWER
+    TCP <-->|"Wi-Fi TCP"| ENTRANCE
+
+    classDef interface fill:#EAF3FF,stroke:#4379AE,color:#173B62,stroke-width:1.5px
+    classDef processing fill:#F2ECFF,stroke:#8968BE,color:#322255,stroke-width:1.5px
+    classDef storage fill:#EAF7ED,stroke:#53986B,color:#214B31,stroke-width:1.5px
+    classDef hardware fill:#FFF2DE,stroke:#CB9443,color:#644015,stroke-width:1.5px
+    class WEB,LCD,PHONE interface
+    class CV,YOLO,PY,TCP,NTFY processing
+    class PHOTO,DB storage
+    class CAM,MAIN,DRAWER,ENTRANCE hardware
 ```
 
 Python 애플리케이션은 Jetson에서 실행되며 인식·기록·좌표 변환·HTTP 요청·외출 재확인을 담당합니다. C TCP 서버는 DB 요청과 서랍·현관 노드의 메시지를 중계합니다. 레이저 제어는 Python에서 STM32로 직접 전달합니다. LCD는 정보를 조회하고 표시하며 장치를 제어하지 않습니다.
