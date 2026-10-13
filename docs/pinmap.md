@@ -1,13 +1,16 @@
 # Retrace 핀맵
 
-> Retrace 프로젝트의 MCU 보드 3개(STM32 ×2, ESP32 ×1) 핀 배정과 설정 정리.
-> 메시지 형식은 [protocol.md](protocol.md)를 참고합니다. Jetson Nano는 USB 장치만 연결하므로 핀맵 대상이 아닙니다.
+> STM32 두 대와 ESP32 두 대의 현재 핀 배정·구동 설정입니다. 소스 확인 기준 2026-10-13.
+> 메시지는 [protocol.md](protocol.md), 검증 결과는 [classroom_test_checklist.md](classroom_test_checklist.md)를 참고합니다.
 
-| 보드 | 역할 | 프로젝트 폴더 | Jetson 연결 | 상태 |
-|---|---|---|---|---|
-| **STM32 #1** (NUCLEO-F411RE) | 메인 유닛 (Pan/Tilt 서보, 레이저, PIR) | `stm32/main_unit` | USB Serial (VCP) | 펌웨어·빌드 완료 / 실물 확인 전 |
-| **STM32 #2** (NUCLEO-F411RE) | 서랍 노드 (서보 ×6, LED ×6, 비상 버튼) | `stm32/drawer` | Bluetooth (HC-06) | 펌웨어·빌드 완료 / 실물 확인 전 |
-| **ESP32 #1** (LOLIN D32) | 현관등 (PIR, LED) | `esp32/entrance_node` | Wi-Fi · TCP | GPIO34/25 구현·빌드 완료 / 실물 확인 전 |
+| 보드 | 역할 | 프로젝트 | 연결 |
+|---|---|---|---|
+| STM32 #1 NUCLEO-F411RE | 레이저·Pan/Tilt·PIR① | `stm32/main_unit` | USB VCP 115200 |
+| STM32 #2 NUCLEO-F411RE | PCA9685·서랍 6개·LED·SOS | `stm32/drawer` | HC-06 UART 9600 |
+| ESP32 #1 LOLIN D32 | PIR②·현관 센서등 | `esp32/entrance_node` | Wi-Fi TCP |
+| ESP32 #2 ESP32-C3 Super Mini | I2C 1602 LCD | `esp32/preparation_display` | Wi-Fi HTTP |
+
+Jetson은 USB 웹캠·STM32 VCP·Bluetooth 동글을 사용하며 직접 GPIO로 서보를 제어하지 않습니다.
 
 ---
 
@@ -62,9 +65,9 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 | Pulse | 펄스 폭 | 서보 위치 (일반적) |
 |---|---|---|
 | 0 | PWM HIGH 신호 없음 | 위치 유지·움직임은 서보 실물에서 확인 |
-| 1000 | 1.0 ms | 한쪽 끝 |
-| 1500 | 1.5 ms | 중앙 |
-| 2000 | 2.0 ms | 반대쪽 끝 |
+| 700 | 0.7 ms | 현재 코드의 0° |
+| 1500 | 1.5 ms | 현재 코드의 90° |
+| 2300 | 2.3 ms | 현재 코드의 180° |
 
 - SG90은 제품마다 실제 동작 범위가 다를 수 있음 → 보드 테스트로 최소/최대값 확인 필요.
 
@@ -112,7 +115,7 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 
 | 기능 | 설명 |
 |---|---|
-| Jetson 통신 | ST-LINK USB Serial(VCP), 명령 수신 / 이벤트 송신 (`protocol.md` 2장) |
+| Jetson 통신 | ST-LINK USB Serial(VCP), 명령 수신 / 이벤트 송신 (통신 프로토콜의 메인 유닛 절) |
 | Pan/Tilt 서보 | SG90 ×2, 레이저 조준 |
 | 레이저 | KY-008, ON/OFF |
 | PIR | 공간 내 움직임 감지 → Jetson에 이벤트 전달 |
@@ -191,17 +194,12 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 | 레이저 | GPIO 직결 대신 트랜지스터 스위칭 검토 | 확인 필요 (모듈 전류) |
 | PIR | 전원 5V, 출력 3.3V면 PA10 직결 가능 | 확인 필요 (모델) |
 
-### 2-6. 진행 상황
+### 2-6. 현재 구동 값
 
-- [x] CubeMX 핀 배정 (충돌 없음)
-- [x] Clock 확인 → APB1 timer clock 84MHz, PSC 83 확정
-- [x] 코드 생성 및 라벨·타이머 값 반영 확인
-- [x] 명령 수신·AIM·LASER·HOME·PIR 이벤트 구현
-- [x] 빌드 성공·경고 0개
-- [ ] 레이저 모듈 모델 및 전류 확인
-- [ ] PIR 센서 모델 및 출력 전압 확인
-- [ ] 보드 업로드 및 동작 확인
-- [ ] SG90 실제 동작 범위(Pulse 최소/최대) 측정
+- `pan_tilt.c`: 0~180°를 700~2300µs로 변환, TIM3 50Hz.
+- MCU `HOME`: 90°/90°·레이저 OFF. Python 안내 후 복귀는 기본 85°/42°로 별도 설정.
+- PIR①: 50ms 안정화 후 `EVT@PIR:1` / `EVT@PIR:0`.
+- 각도 설정 응답은 실제 기구 위치를 센서로 측정한 결과가 아닙니다. 설치 환경의 축 방향·범위·보정은 실측 기록과 함께 관리합니다.
 
 ---
 
@@ -215,13 +213,13 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 |---|---|
 | 서랍 팝업 서보 | SG90 ×6, PCA9685의 CH0~CH5로 제어 |
 | 서랍 LED | LED ×6, 열린 서랍 표시 (타이머 자동 소등) |
-| 비상 버튼 | Jetson 서버 로그 이벤트 (`EVT@clientID:SOS`); 폰 사이렌은 후속 구현 |
-| Jetson 통신 | HC-06 Bluetooth (USART1) (`protocol.md` 3장) |
+| 비상 버튼 | `EVT@DRAWER:SOS` → C TCP 서버 → Python → ntfy 휴대폰 알림 |
+| Jetson 통신 | HC-06 Bluetooth (USART1) (통신 프로토콜의 서랍 절) |
 | PC 테스트 | ST-LINK VCP (USART2) — 명령 수신 · 응답 및 SOS 이벤트 |
 
 ### 3-2. 서랍 번호
 
-`protocol.md`의 `clientID:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
+`protocol.md`의 `DRAWER:OPEN:n`, `LED:n:ON`의 **n은 아래 번호**를 따릅니다. 서보·LED 번호도 같습니다.
 
 ```text
 ┌─────────┬─────────┐
@@ -349,27 +347,21 @@ PWM 주파수 = 타이머 클럭 / ((PSC + 1) × (ARR + 1))
 | LED | 핀마다 **전류 제한 저항**(220~330Ω) 직렬 연결 |
 | 비상 버튼 | 내부 Pull-up 사용 → 외부 저항 불필요, 채터링은 코드에서 처리 |
 
-### 3-6. 진행 상황
+### 3-6. 현재 구동 값
 
-- [x] 프로젝트 생성 (`drawer.ioc`, NUCLEO-F411RE, 보드 기본 설정)
-- [x] TIM3/TIM4 비활성화
-- [x] I2C2: PB10/PB9 = SCL/SDA, Standard Mode 100kHz
-- [x] PCA9685: CH0~CH5 = 서랍 1~6, 50Hz 제어 코드 구현
-- [x] USART1: PA9/PA10 = `HC06_TX`/`HC06_RX`, 9600, NVIC
-- [x] GPIO: PA0/PA1/PA4/PB0/PC1/PC0 = `LED_1~6`
-- [x] PB5 = `SOS_BTN` (GPIO Input, Pull-up, 폴링)
-- [x] Project Manager → 코드 생성
-- [x] UART 명령 · LED · 서보 순차 밀기·복귀 · 10초 소등 · SOS 이벤트 구현
-- [x] PCA9685 전환 후 Debug 빌드 성공·경고 0개
-- [ ] I2C 연결 · PCA9685 주소 · 서보 펄스 보정 · 보드 업로드 및 실물 동작 확인
+| 항목 | 코드 값 |
+|---|---|
+| 밀기 펄스·유지 | 1400µs·500ms |
+| 복귀 펄스·유지 | 1900µs·1000ms |
+| PCA9685 주소·출력 | 0x40·50Hz·CH0~CH5 |
+| LED 소등 | 마지막 점등부터 10초 |
+| SOS 디바운스 | 50ms, active LOW |
 
-### 3-7. 확인 필요 항목
+동작 중 새 열기 요청은 BUSY로 거절합니다. 완료 뒤 `OK@DRAWER`, I2C 오류 시 `ERR@DRAWER:I2C`를 보냅니다. 복귀 후 해당 채널은 Full OFF이며 서랍을 자동으로 닫는 동작은 아닙니다.
 
-- [ ] 서랍 실제 배치 (2열× 3행 맞는지, LED 연결이 위 번호 그림과 일치하는지)
-- [ ] HC-06 통신 속도 (9600 기본값인지)
-- [ ] PCA9685 주소 `0x40` 응답 및 50Hz 출력 확인
-- [ ] 서보 복귀 / 밀어내기 Pulse 값 보정 (현재 1000µs / 2000µs)
-- [ ] PB1 미사용 이유 기록
+### 3-7. 배선·실측 확인
+
+서랍 정면 기준의 번호, HC-06 실제 UART 속도, PCA9685 주소·I2C 전압, 설치된 서보의 기계 범위와 펄스·유지 시간을 확인합니다. 현재 코드 값을 변경하면 이 문서와 프로토콜을 함께 갱신합니다.
 
 ---
 
@@ -408,9 +400,9 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 |---|---|
 | 외출 감지 | PIR 움직임 → TCP `EVT@ENTRANCE:PIRON` |
 | 현관등 | 평소 센서등 점등 / Jetson `ALERT` 명령 시 경고 점등 |
-| Jetson 통신 | Wi-Fi · 인증 TCP client (`protocol.md` 4장) |
+| Jetson 통신 | Wi-Fi · 인증 TCP client (통신 프로토콜의 현관 TCP 절) |
 
-### 5-2. 코드에 반영한 핀 배정 (실물 검증 전)
+### 5-2. 현재 핀 배정
 
 | 부품 | 핀 | 설정 | 코드 상수 |
 |---|---|---|---|
@@ -421,31 +413,55 @@ ESP32는 **전원 켤 때 부팅 방식을 정하는 핀(스트래핑 핀)**이 
 - **현관등 LED**: GPIO25로 제어. 저항 내장 모듈이 아니면 220~330Ω 전류 제한 저항을 직렬 연결.
 
 - PIR 50ms 필터, 움직임 종료 후 7초 점등 유지. `ALERT`는 250ms마다 ON/OFF하며 10초 후 기본 센서등 모드로 복귀.
-- Wi-Fi·TCP가 없어도 기본 센서등 동작. 실제 업로드·PIR·LED·네트워크 검증은 강의실에서 진행.
+- Wi-Fi·TCP가 없어도 기본 센서등은 동작합니다. 실제 연결·전원·점등 결과는 검증 기록으로 관리합니다.
 
-### 5-3. 배선 메모
+### 5-3. 전원·통신
 
-| 항목 | 내용 | 상태 |
+- 사용자 시연 구성: **18650 배터리 두 개** 사용. 직렬·병렬 방식과 변환 회로는 실물 배선 기록을 기준으로 하며 문서만으로 추정하지 않습니다.
+- PIR 출력과 LED 구동은 위 GPIO34/25를 사용합니다. 센서 모델의 공급 전압과 출력 전압, 보드의 실제 전원 입력 규격을 함께 확인합니다.
+- `network_config.example.h`를 개인 `network_config.h`로 복사해 Wi-Fi·Jetson TCP 주소·로그인 계정을 설정합니다. 예제 기본 TCP 포트는 5000입니다.
+- 예제 설정이 비어 있으면 기본 센서등만 동작합니다. 개인 자격 증명은 Git에 올리지 않습니다.
+
+---
+
+## 6. ESP32 #2 LCD (ESP32-C3 Super Mini)
+
+### 6-1. 역할·핀
+
+4핀 I2C 1602 LCD를 연결해 최근 목격 물건과 시각, 준비물·날씨를 표시합니다. HTTP 조회 전용 노드입니다.
+
+| 연결 | C3 핀·설정 | 코드 설정 |
 |---|---|---|
-| 전원 | USB 5V 어댑터 (시연용) | |
-| PIR 전원 | HC-SR501은 5V 필요, 출력은 3.3V라 GPIO 직결 가능 | 확인 필요 (모델) |
-| 배터리 | 배터리로만 쓰면 5V가 없을 수 있음 → 3.3V용 PIR(AM312 등) 검토 | 시연은 USB 전원 |
+| LCD SDA | GPIO4 | `LCD_SDA_PIN` |
+| LCD SCL | GPIO5 | `LCD_SCL_PIN` |
+| LCD GND | 공통 GND | 실물 배선 |
+| LCD I2C 주소 | 기본 0x27 | `LCD_ADDRESS` |
+| 표시 크기 | 16열×2행 | `lcd.begin(16, 2, Wire)` |
+| 진단 시리얼 | 115200 | PlatformIO monitor |
+
+LCD 백팩의 전원·I2C 풀업 전압을 확인합니다. C3 GPIO는 3.3V 기준이며 5V I2C 풀업을 직접 연결하지 않습니다. 5V 백팩이면 양방향 I2C 레벨 변환을 적용하고 GND를 공통으로 연결합니다. 대비는 LCD 백팩의 가변저항으로 조절합니다.
+
+### 6-2. 설정·조회 주기
+
+`display_config.example.h`를 개인 `display_config.h`로 복사합니다. Wi-Fi와 `RETRACE_API_BASE=http://<Jetson-IP>:8080`을 설정하며, API 포트를 바꿨다면 함께 맞춥니다. C3의 localhost는 Jetson이 아닙니다.
+
+| 항목 | 기본값 |
+|---|---|
+| `/api/items` 목격 조회 | 10초 |
+| `/api/leave-items` 준비물 조회 | 15초 |
+| 화면 순환 | 5초 이상 |
+| 새 목격 우선 표시 | 5초 |
+| 날씨 조회·실패 재시도 | 10분·30초 |
+| 준비물 표시 시간 | 한국 시간 07:00 이상, 08:00 미만 |
+
+일반 1602 LCD는 영문 이름을 표시합니다. 최근 사진·시각이 있는 물건 최대 3개를 보여주며 조회 실패 시 캐시·오프라인 상태를 표시합니다. 자세한 날씨·인증서·표시 규칙은 [LCD README](../esp32/preparation_display/README.md)를 참고합니다.
+
+### 6-3. 빌드
+
+PlatformIO 환경 이름은 `esp32c3`, 보드 설정 ID는 `esp32-c3-devkitm-1`, 실제 사용 제품은 ESP32-C3 Super Mini입니다. 프로젝트 폴더는 `esp32/preparation_display`입니다.
 
 ---
 
-### 5-4. 진행 상황
+## 7. 전체 실측 기록
 
-- [x] PIR 센서등·시간 유지·NORMAL/ALERT·Wi-Fi/TCP·재연결 구현
-- [x] 기본·네트워크 활성화 빌드 성공·경고 0개
-- [ ] 개인 `network_config.h`에 Wi-Fi·Jetson IP 입력 후 실제 보드용 `lolin_d32` 재빌드·업로드
-- [ ] PIR·LED 구동, 실제 TCP 로그인·이벤트·연결 유실 검증
-
----
-
-## 6. 전체 확인 필요 항목
-
-- [ ] STM32 #1: 레이저 모듈 전류, PIR 모델, SG90 동작 범위
-- [ ] STM32 #2: PCA9685 I2C 연결·주소, 서랍 실제 배치, HC-06 통신 속도, 서보 밀기·복귀 펄스와 시간 보정, PB1 미사용 이유
-- [ ] ESP32 #1: PIR 모델, 한 색 LED 구동 회로·실제 점등, Wi-Fi/TCP 연결
-
-실행 항목과 결과 기록은 [강의실 통합 테스트](classroom_test_checklist.md)에서 관리합니다. 보드 단독 검증 후 feature → develop PR로 기능을 통합하고 Jetson·웹과 전체 연동을 확인합니다.
+핀 배정은 `.ioc`·`main.h`·각 ESP32의 코드 및 설정 예제를 기준으로 합니다. 서보 범위, 레이저·PIR 모델, 공급 전압, HC-06 실제 속도, I2C 주소, 통신 유실 시 동작은 실제 장치에서 확인하고 [통합 체크리스트](classroom_test_checklist.md)에 결과를 기록합니다.

@@ -1,9 +1,9 @@
 # 개발 환경 및 버전 관리
 
-확인일: 2026-10-06
+문서 갱신: 2026-10-13. VS Code 확장 표는 2026-10-06의 설치 기록이며, 프로젝트 선언과 Windows Python 환경은 아래 확인 기준을 구분합니다.
 
 이 문서는 Retrace 프로젝트의 개발 환경과 버전을 기록한다.
-아래 버전은 현재 개발 PC와 프로젝트 설정에서 확인한 값이며, 팀 공통 기준은 협의 후 확정한다.
+빌드 설정에 고정된 버전, 개인 PC의 설치 기록, Jetson용 패키지 선언을 구분한다. 이 문서 갱신 과정에서 패키지를 설치하거나 버전을 변경하지 않았다.
 
 ## 1. VS Code 및 확장
 
@@ -116,7 +116,7 @@ ESP32 프로젝트는 `platform = espressif32@7.1.3`으로 버전을 고정한�
 
 ### 3-1. Windows 개인 개발 환경
 
-현재 저장소 루트의 `.venv`에서 확인한 버전이다.
+2026-10-13 저장소 루트의 `.venv` 패키지 메타데이터로 다시 확인한 Windows 개인 환경이다. CPU용 PyTorch를 사용하며 Jetson 환경과 구분한다.
 
 | 항목 | 설치 버전 |
 |---|---|
@@ -133,10 +133,23 @@ ESP32 프로젝트는 `platform = espressif32@7.1.3`으로 버전을 고정한�
 
 Jetson 카메라 실행에 필요한 Python 패키지는 `jetson_nano/requirements.txt`로 관리하고 팀원과 공유한다.
 
-현재 선언된 패키지 버전:
+현재 `requirements.txt`의 선언:
 
-- Ultralytics: 8.3.0
-- OpenCV: 5.0.0.93
+- `ultralytics==8.4.107`
+- `typing_extensions==4.13.2`
+- `filelock==3.16.1`
+- `pyserial==3.5`
+
+파일 안내는 `--system-site-packages` 가상환경과 `--no-deps` 설치를 사용하여 JetPack의 CUDA PyTorch·동작 중인 OpenCV를 유지하도록 한다. OpenCV·PyTorch를 이 파일에서 새 버전으로 설치하거나 Windows CPU 환경으로 대체하지 않는다.
+
+```sh
+python3 -m venv --system-site-packages .venv
+. .venv/bin/activate
+python -m pip install --no-deps -r jetson_nano/requirements.txt
+python -m pip show ultralytics torch torchvision opencv-python pyserial
+```
+
+위 명령은 해당 Jetson에 필요한 기반 패키지가 준비된 뒤 사용하는 실행 안내다. 현재 문서 정리로 Jetson의 실제 설치·CUDA·추론 성공을 재검증한 것은 아니다.
 
 이 파일은 Jetson 환경을 기준으로 작성했으며, Windows 개인 개발 환경과 구분한다.
 Windows 설치 버전과 다르다는 이유로 변경하지 않는다.
@@ -144,8 +157,26 @@ Windows 설치 버전과 다르다는 이유로 변경하지 않는다.
 Python·PyTorch 등 나머지 구성은 실제 Jetson 환경에 맞춰 관리한다.
 패키지 버전을 변경할 때는 실제 Jetson에서 설치 및 실행을 검증한 뒤 반영한다.
 
-카메라 확인용 코드인 `jetson_nano/vision/webcam_test.py`도 팀원과 공유한다.
-실행 환경, 필요한 패키지, 사용 방법을 확인한 뒤 테스트에 사용한다.
+현재 실행 진입점은 `python jetson_nano/main.py`다. `vision/jetson_app.py`가 웹캠·YOLO·USB·TCP·HTTP를 초기화하며 추론은 `detector.py`의 `device=0`을 사용한다. 삭제된 `webcam_test.py`를 실행 대상으로 안내하지 않는다.
+
+현재 모델은 `jetson_nano/models/yolo/coco83_yolo26n_v6_demo_desk.pt`이며, CUDA와 모델 로딩은 실제 Jetson에서 확인한다. C TCP 서버와 DB는 [서버 README](../jetson_nano/server_jetson/README.md), 웹은 [웹 README](../web/README.md) 기준으로 준비한다.
+
+### 3-3. ESP32-C3 LCD 의존성
+
+`esp32/preparation_display/platformio.ini` 기준: `espressif32@7.1.3`, Arduino 프레임워크, 환경 `esp32c3`, 보드 ID `esp32-c3-devkitm-1`, `ArduinoJson@6.21.5`, `LiquidCrystal_PCF8574@2.3.0`. 실제 제품은 ESP32-C3 Super Mini다. 개인 Wi-Fi·LCD 설정은 `display_config.h`로 분리하며 인증서 번들은 소스에 포함된다.
+
+### 3-4. 서버·주소·개인 설정
+
+| 대상 | 기본 주소·포트 | 설정 위치 |
+|---|---|---|
+| C TCP 서버 | 5000 | `server_jetson/.env.example` → 개인 `.local/db.env` |
+| 웹·LCD HTTP API | 8080 | `RETRACE_HTTP_HOST` / `RETRACE_HTTP_PORT` |
+| 현관 TCP | Jetson IP:5000 | 개인 `network_config.h` |
+| LCD HTTP | Jetson IP:8080 | 개인 `display_config.h` |
+| 서랍 중계 | HC-06 RFCOMM | 개인 `clientID.conf`, 서버 로그인 계정 |
+| 휴대폰 알림 | 운영 ntfy URL·토픽 | `RETRACE_NTFY_URL` / `RETRACE_NTFY_TOPIC` |
+
+공유하는 파일은 예제이며 실제 비밀번호·개인 IP·MAC·DB 환경은 Git에 추가하지 않는다. 노드의 localhost와 Jetson의 localhost는 다른 컴퓨터다.
 
 ## 4. 공유 및 변경 원칙
 
