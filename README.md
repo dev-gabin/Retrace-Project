@@ -248,4 +248,3 @@ Retrace-Project/
 | [웹 실행·연동](web/README.md) | 웹 프론트엔드 실행 |
 | [LCD 배선·표시·설정](esp32/preparation_display/README.md) | LCD 노드 연결과 동작 |
 | [협업·Git 규칙](CONTRIBUTING.md) | Git 브랜치 및 협업 규칙 |
-```
