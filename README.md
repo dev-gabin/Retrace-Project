@@ -249,13 +249,3 @@ Retrace-Project/
 | [LCD 배선·표시·설정](esp32/preparation_display/README.md) | LCD 노드 연결과 동작 |
 | [협업·Git 규칙](CONTRIBUTING.md) | Git 브랜치 및 협업 규칙 |
 ```
-
-## 수정 결과
-
-- **시스템 구조:** 네모 박스형 Mermaid 다이어그램으로 정리
-- **통신 관계:** HTTP, USB Serial, RFCOMM, Wi-Fi TCP 유지
-- **프로젝트 설명:** 원본의 핵심 내용과 수치 유지
-- **가독성:** 전체 아키텍처와 장치별 통신 관계를 분리해 표현
-- **Markdown:** 채팅에 섞였던 이스케이프 문자 정리
-
-**현재 상태:** README 전체 수정본 작성 완료. 실제 GitHub 렌더링은 아직 확인하지 못했으며, 커밋·푸시는 하지 않았어.
